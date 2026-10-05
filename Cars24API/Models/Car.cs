@@ -22,6 +22,10 @@ public class Car
     public string Price { get; set; } = string.Empty;
     public string Emi { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
+    // Normalized city derived from Location. Optional so that existing
+    // MongoDB documents (which predate this field) continue to load.
+    [BsonIgnoreIfNull]
+    public string? City { get; set; }
     public Specs Specs { get; set; } = new Specs();
     public List<string> Features { get; set; } = new List<string>();
     public List<string> Highlights { get; set; } = new List<string>();

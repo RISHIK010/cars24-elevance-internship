@@ -33,7 +33,37 @@ export const getcarByid = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`);
   return response.json();
 };
-export const getcarSummaries = async () => {
-  const response = await fetch(`${BASE_URL}/summaries`);
+export const getcarSummaries = async (city?: string) => {
+  const url = city
+    ? `${BASE_URL}/summaries?city=${encodeURIComponent(city)}`
+    : `${BASE_URL}/summaries`;
+  const response = await fetch(url);
+  return response.json();
+};
+
+export type SupportedCity = {
+  name: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type ServiceHub = {
+  name: string;
+  type: string; // ServiceCenter | PickupPoint | Hub
+  city: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+};
+
+export const getSupportedCities = async (): Promise<SupportedCity[]> => {
+  const response = await fetch(`${BASE_URL}/cities`);
+  return response.json();
+};
+
+export const getHubs = async (city: string): Promise<ServiceHub[]> => {
+  const response = await fetch(
+    `${BASE_URL}/hubs?city=${encodeURIComponent(city)}`
+  );
   return response.json();
 };

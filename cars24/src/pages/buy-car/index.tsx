@@ -1,11 +1,22 @@
 "use client";
+import CityMap from "@/components/buycar/CityMap";
+import CitySelector from "@/components/buycar/CitySelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { getcarSummaries } from "@/lib/Carapi";
+import {
+  getcarSummaries,
+  getHubs,
+  getSupportedCities,
+  ServiceHub,
+  SupportedCity,
+} from "@/lib/Carapi";
+import { findNearestCity } from "@/lib/geo";
 import { ChevronDown, Heart, Search, Sliders } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // const cars = [
 //   {
@@ -131,16 +142,135 @@ function LoaderCard() {
   );
 }
 const index = () => {
+  const router = useRouter();
   const [priceRange, setPriceRange] = useState([0, 1000000]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [cars, setCars] = useState<Car[] | null>(null);
+  const [supportedCities, setSupportedCities] = useState<SupportedCity[]>([]);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [hubs, setHubs] = useState<ServiceHub[]>([]);
+  const [locating, setLocating] = useState(false);
+
+  // The selected city lives in the ?city= query param so the geo-fence
+  // survives refreshes and can be shared via URL.
   useEffect(() => {
+    if (!router.isReady) return;
+    const cityParam = router.query.city;
+    setSelectedCity(typeof cityParam === "string" ? cityParam : "");
+  }, [router.isReady, router.query.city]);
+
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        const cities = await getSupportedCities();
+        setSupportedCities(cities);
+      } catch {
+        toast.error("Unable to load supported cities right now.");
+      }
+    };
+    loadCities();
+  }, []);
+
+  // Server-side geo-fencing: refetch listings whenever the city changes.
+  useEffect(() => {
+    if (!router.isReady) return;
     const fetchCars = async () => {
-      const car = await getcarSummaries();
-      setCars(car);
+      try {
+        const car = await getcarSummaries(selectedCity || undefined);
+        setCars(car);
+      } catch {
+        setCars([]);
+        toast.error("Unable to load cars right now.");
+      }
     };
     fetchCars();
-  }, []);
+  }, [router.isReady, selectedCity]);
+
+  // Load the service centers / pickup hubs for the map.
+  useEffect(() => {
+    if (!selectedCity) {
+      setHubs([]);
+      return;
+    }
+    const loadHubs = async () => {
+      try {
+        setHubs(await getHubs(selectedCity));
+      } catch {
+        setHubs([]);
+      }
+    };
+    loadHubs();
+  }, [selectedCity]);
+
+  const updateCityQuery = (city: string) => {
+    const query = { ...router.query };
+    if (city) {
+      query.city = city;
+    } else {
+      delete query.city;
+    }
+    router.push({ pathname: router.pathname, query }, undefined, {
+      shallow: true,
+    });
+  };
+
+  const handleUseMyLocation = () => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      toast.error(
+        "Location services are not supported by this browser. Please select your city manually."
+      );
+      return;
+    }
+    if (supportedCities.length === 0) {
+      toast.error(
+        "Supported cities are still loading. Please try again or select your city manually."
+      );
+      return;
+    }
+    setLocating(true);
+    // One-shot, user-triggered position request. No tracking or watching.
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocating(false);
+        const nearest = findNearestCity(
+          {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          },
+          supportedCities
+        );
+        if (nearest) {
+          updateCityQuery(nearest.name);
+          toast.success(`Location detected. Showing cars in ${nearest.name}.`);
+        } else {
+          toast.error(
+            "Could not match your location to a supported city. Please select it manually."
+          );
+        }
+      },
+      (error) => {
+        setLocating(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error(
+            "Location permission denied. Please select your city manually."
+          );
+        } else if (error.code === error.TIMEOUT) {
+          toast.error(
+            "Location request timed out. Please try again or select your city manually."
+          );
+        } else {
+          toast.error(
+            "Unable to detect your location. Please select your city manually."
+          );
+        }
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  const selectedCityInfo = supportedCities.find(
+    (city) => city.name === selectedCity
+  );
   return (
     <div className="bg-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white text-black">
@@ -198,8 +328,18 @@ const index = () => {
           </div>
           {/* cars grid */}
           <div className="md:col-span-3">
+            <CitySelector
+              cities={supportedCities}
+              selectedCity={selectedCity}
+              locating={locating}
+              onSelectCity={updateCityQuery}
+              onUseMyLocation={handleUseMyLocation}
+              onClearCity={() => updateCityQuery("")}
+            />
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold">Used Cars in Delhi NCR</h1>
+              <h1 className="text-2xl font-bold">
+                Used Cars {selectedCity ? `in ${selectedCity}` : "Across India"}
+              </h1>
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <Input
@@ -219,6 +359,10 @@ const index = () => {
                 </Button>
               </div>
             </div>
+
+            {selectedCityInfo && (
+              <CityMap city={selectedCityInfo} hubs={hubs} />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {cars === null
@@ -278,6 +422,13 @@ const index = () => {
                     </Link>
                   ))}
             </div>
+            {cars !== null && cars.length === 0 && (
+              <p className="text-center text-gray-500 mt-6">
+                {selectedCity
+                  ? `No cars found in ${selectedCity}. Try clearing the city filter.`
+                  : "No cars found."}
+              </p>
+            )}
           </div>
         </div>
       </div>
