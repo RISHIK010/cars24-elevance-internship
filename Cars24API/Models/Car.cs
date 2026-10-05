@@ -29,4 +29,14 @@ public class Car
     public Specs Specs { get; set; } = new Specs();
     public List<string> Features { get; set; } = new List<string>();
     public List<string> Highlights { get; set; } = new List<string>();
+    // Optional popularity signal used for relevance ranking. Existing MongoDB
+    // documents (which predate this field) load with null and are treated as
+    // neutral by the search scorer. No analytics/tracking is performed.
+    [BsonIgnoreIfNull]
+    public int? Popularity { get; set; }
+    // Optional creation timestamp used for recency ranking. Existing MongoDB
+    // documents load with null and receive a neutral recency score.
+    [BsonIgnoreIfNull]
+    [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
+    public DateTime? CreatedAtUtc { get; set; }
 }

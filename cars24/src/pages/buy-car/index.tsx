@@ -1,8 +1,7 @@
 "use client";
 import CityMap from "@/components/buycar/CityMap";
 import CitySelector from "@/components/buycar/CitySelector";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import SearchAutocomplete from "@/components/search/SearchAutocomplete";
 import { Slider } from "@/components/ui/slider";
 import {
   getcarSummaries,
@@ -18,104 +17,18 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// const cars = [
-//   {
-//     id: "fronx-2023",
-//     title: "2023 Maruti FRONX DELTA PLUS 1.2L AGS",
-//     km: "10,048",
-//     fuel: "Petrol",
-//     transmission: "Auto",
-//     owner: "1st owner",
-//     emi: "₹15,245/m",
-//     price: "₹7.80 lakh",
-//     location: "Metro Walk, Rohini, New Delhi",
-//     image: "https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg",
-//   },
-//   {
-//     id: "swift-2017",
-//     title: "2017 Maruti Swift VXI (O)",
-//     km: "60,056",
-//     fuel: "Petrol",
-//     transmission: "Manual",
-//     owner: "1st owner",
-//     emi: "₹7,214/m",
-//     price: "₹3.69 lakh",
-//     location: "Metro Walk, Rohini, New Delhi",
-//     image: "https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg",
-//   },
-//   {
-//     id: "creta-2021",
-//     title: "2021 Hyundai Creta SX IVT",
-//     km: "20,500",
-//     fuel: "Petrol",
-//     transmission: "Auto",
-//     owner: "1st owner",
-//     emi: "₹18,999/m",
-//     price: "₹11.20 lakh",
-//     location: "Sector 29, Gurugram",
-//     image: "https://images.pexels.com/photos/358070/pexels-photo-358070.jpeg",
-//   },
-//   {
-//     id: "baleno-2020",
-//     title: "2020 Maruti Baleno ZETA",
-//     km: "30,000",
-//     fuel: "Petrol",
-//     transmission: "Manual",
-//     owner: "2nd owner",
-//     emi: "₹10,600/m",
-//     price: "₹6.45 lakh",
-//     location: "Karol Bagh, New Delhi",
-//     image: "https://images.pexels.com/photos/112460/pexels-photo-112460.jpeg",
-//   },
-//   {
-//     id: "eco-2018",
-//     title: "2018 Maruti Eeco 5 STR WITH A/C+HTR",
-//     km: "45,000",
-//     fuel: "Petrol",
-//     transmission: "Manual",
-//     owner: "1st owner",
-//     emi: "₹5,300/m",
-//     price: "₹3.10 lakh",
-//     location: "Lajpat Nagar, New Delhi",
-//     image: "https://images.pexels.com/photos/358070/pexels-photo-358070.jpeg",
-//   },
-//   {
-//     id: "city-2019",
-//     title: "2019 Honda City ZX CVT",
-//     km: "25,000",
-//     fuel: "Petrol",
-//     transmission: "Auto",
-//     owner: "1st owner",
-//     emi: "₹16,500/m",
-//     price: "₹9.95 lakh",
-//     location: "South Ex, New Delhi",
-//     image: "https://images.pexels.com/photos/244206/pexels-photo-244206.jpeg",
-//   },
-//   {
-//     id: "venue-2022",
-//     title: "2022 Hyundai Venue SX Turbo",
-//     km: "12,000",
-//     fuel: "Petrol",
-//     transmission: "Auto",
-//     owner: "1st owner",
-//     emi: "₹14,875/m",
-//     price: "₹9.40 lakh",
-//     location: "Noida Sector 63, Uttar Pradesh",
-//     image: "https://images.pexels.com/photos/244206/pexels-photo-244206.jpeg",
-//   },
-//   {
-//     id: "altroz-2021",
-//     title: "2021 Tata Altroz XT Petrol",
-//     km: "18,000",
-//     fuel: "Petrol",
-//     transmission: "Manual",
-//     owner: "1st owner",
-//     emi: "₹9,350/m",
-//     price: "₹6.75 lakh",
-//     location: "Dwarka, New Delhi",
-//     image: "https://images.pexels.com/photos/1280560/pexels-photo-1280560.jpeg",
-//   },
-// ];
+const BRANDS = ["Maruti", "Hyundai", "Honda", "Tata"];
+const FUEL_TYPES = ["Petrol", "Diesel", "CNG", "Electric", "Hybrid", "LPG"];
+const TRANSMISSIONS = ["Manual", "Automatic", "AMT", "CVT", "DCT"];
+const SORT_OPTIONS = [
+  { value: "relevance", label: "Relevance" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+  { value: "km_asc", label: "Km: Low to High" },
+  { value: "year_desc", label: "Year: Newest First" },
+];
+const MAX_PRICE = 1000000;
+
 interface Car {
   id: string;
   title: string;
@@ -123,11 +36,13 @@ interface Car {
   fuel: string;
   transmission: string;
   owner: string;
+  year: number;
   emi: string;
   price: string;
   location: string;
   image: string;
 }
+
 function LoaderCard() {
   return (
     <div className="bg-white rounded-lg shadow-md animate-pulse overflow-hidden">
@@ -141,23 +56,73 @@ function LoaderCard() {
     </div>
   );
 }
+
 const index = () => {
   const router = useRouter();
-  const [priceRange, setPriceRange] = useState([0, 1000000]);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [cars, setCars] = useState<Car[] | null>(null);
   const [supportedCities, setSupportedCities] = useState<SupportedCity[]>([]);
-  const [selectedCity, setSelectedCity] = useState("");
   const [hubs, setHubs] = useState<ServiceHub[]>([]);
   const [locating, setLocating] = useState(false);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, MAX_PRICE]);
+  const [searchText, setSearchText] = useState("");
 
-  // The selected city lives in the ?city= query param so the geo-fence
-  // survives refreshes and can be shared via URL.
+  const qstr = (key: string): string =>
+    typeof router.query[key] === "string" ? (router.query[key] as string) : "";
+
+  const brands: string[] = Array.isArray(router.query.brand)
+    ? (router.query.brand as string[])
+    : router.query.brand
+    ? [router.query.brand as string]
+    : [];
+
+  const city = qstr("city");
+  const fuel = qstr("fuel");
+  const transmission = qstr("transmission");
+  const sort = qstr("sort");
+  const minYear = qstr("minYear");
+  const maxYear = qstr("maxYear");
+  const minKm = qstr("minKm");
+  const maxKm = qstr("maxKm");
+
+  // Update only the provided query params so unrelated filters survive.
+  const updateQuery = (
+    next: Record<string, string | string[] | undefined>
+  ) => {
+    const query: Record<string, string | string[]> = {
+      ...(router.query as Record<string, string | string[]>),
+    };
+    for (const [key, value] of Object.entries(next)) {
+      if (
+        value === undefined ||
+        value === null ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0)
+      ) {
+        delete query[key];
+      } else {
+        query[key] = value;
+      }
+    }
+    router.push({ pathname: router.pathname, query }, undefined, {
+      shallow: true,
+    });
+  };
+  // Sync the search box only when the ?search= param changes (e.g. refresh,
+  // Hero navigation or shared link) so in-progress typing is not clobbered.
   useEffect(() => {
     if (!router.isReady) return;
-    const cityParam = router.query.city;
-    setSelectedCity(typeof cityParam === "string" ? cityParam : "");
-  }, [router.isReady, router.query.city]);
+    setSearchText(qstr("search"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.search]);
+
+  // Sync the price slider only when the price params change.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const min = qstr("minPrice");
+    const max = qstr("maxPrice");
+    setPriceRange([min ? Number(min) : 0, max ? Number(max) : MAX_PRICE]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.minPrice, router.query.maxPrice]);
 
   useEffect(() => {
     const loadCities = async () => {
@@ -171,49 +136,76 @@ const index = () => {
     loadCities();
   }, []);
 
-  // Server-side geo-fencing: refetch listings whenever the city changes.
+  // Fetch listings whenever any search/filter param changes.
   useEffect(() => {
     if (!router.isReady) return;
+    const brandParam = Array.isArray(router.query.brand)
+      ? (router.query.brand as string[])
+      : router.query.brand
+      ? [router.query.brand as string]
+      : undefined;
+
     const fetchCars = async () => {
       try {
-        const car = await getcarSummaries(selectedCity || undefined);
-        setCars(car);
+        const data = await getcarSummaries({
+          search: qstr("search") || undefined,
+          city: qstr("city") || undefined,
+          brand: brandParam,
+          fuel: qstr("fuel") || undefined,
+          transmission: qstr("transmission") || undefined,
+          minKm: qstr("minKm") || undefined,
+          maxKm: qstr("maxKm") || undefined,
+          minYear: qstr("minYear") || undefined,
+          maxYear: qstr("maxYear") || undefined,
+          minPrice: qstr("minPrice") || undefined,
+          maxPrice: qstr("maxPrice") || undefined,
+          sort: qstr("sort") || undefined,
+        });
+        setCars(Array.isArray(data) ? data : []);
       } catch {
         setCars([]);
         toast.error("Unable to load cars right now.");
       }
     };
     fetchCars();
-  }, [router.isReady, selectedCity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query]);
 
   // Load the service centers / pickup hubs for the map.
   useEffect(() => {
-    if (!selectedCity) {
+    if (!city) {
       setHubs([]);
       return;
     }
     const loadHubs = async () => {
       try {
-        setHubs(await getHubs(selectedCity));
+        setHubs(await getHubs(city));
       } catch {
         setHubs([]);
       }
     };
     loadHubs();
-  }, [selectedCity]);
+  }, [city]);
 
-  const updateCityQuery = (city: string) => {
-    const query = { ...router.query };
-    if (city) {
-      query.city = city;
-    } else {
-      delete query.city;
-    }
-    router.push({ pathname: router.pathname, query }, undefined, {
-      shallow: true,
-    });
+  const handleSearch = (value: string) => {
+    const trimmed = value.trim();
+    setSearchText(trimmed);
+    updateQuery({ search: trimmed || undefined });
   };
 
+  const toggleBrand = (brand: string) => {
+    const next = new Set(brands);
+    if (next.has(brand)) next.delete(brand);
+    else next.add(brand);
+    updateQuery({ brand: next.size ? Array.from(next) : undefined });
+  };
+
+  const handlePriceCommit = (value: number[]) => {
+    updateQuery({
+      minPrice: value[0] > 0 ? String(value[0]) : undefined,
+      maxPrice: value[1] < MAX_PRICE ? String(value[1]) : undefined,
+    });
+  };
   const handleUseMyLocation = () => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       toast.error(
@@ -240,7 +232,7 @@ const index = () => {
           supportedCities
         );
         if (nearest) {
-          updateCityQuery(nearest.name);
+          updateQuery({ city: nearest.name });
           toast.success(`Location detected. Showing cars in ${nearest.name}.`);
         } else {
           toast.error(
@@ -268,9 +260,8 @@ const index = () => {
     );
   };
 
-  const selectedCityInfo = supportedCities.find(
-    (city) => city.name === selectedCity
-  );
+  const selectedCityInfo = supportedCities.find((c) => c.name === city);
+
   return (
     <div className="bg-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white text-black">
@@ -279,48 +270,145 @@ const index = () => {
           <div className="md:col-span-1 space-y-6">
             <div className="bg-white p-4 rounded-lg shadow">
               <h3 className="font-semibold mb-4">Filters</h3>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
                   <label className="text-sm font-medium mb-2 block">
                     Price Range
                   </label>
                   <Slider
-                    defaultValue={[0, 1000000]}
-                    max={1000000}
+                    min={0}
+                    max={MAX_PRICE}
                     step={10000}
                     value={priceRange}
-                    onValueChange={setPriceRange}
+                    onValueChange={(v) => setPriceRange([v[0], v[1]])}
+                    onValueCommit={handlePriceCommit}
                     className="mt-2"
                   />
                   <div className="flex justify-between mt-2 text-sm text-gray-600">
-                    <span>₹{priceRange[0]}</span>
-                    <span>₹{priceRange[1]}</span>
+                    <span>₹{priceRange[0].toLocaleString("en-IN")}</span>
+                    <span>₹{priceRange[1].toLocaleString("en-IN")}</span>
                   </div>
                 </div>
+
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Brand
-                  </label>
+                  <label className="text-sm font-medium mb-2 block">Brand</label>
                   <div className="space-y-2">
-                    {["Maruti", "Hyundai", "Honda", "Tata"].map((brand) => (
+                    {BRANDS.map((brand) => (
                       <label key={brand} className="flex items-center">
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selectedBrands.includes(brand)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedBrands([...selectedBrands, brand]);
-                            } else {
-                              setSelectedBrands(
-                                selectedBrands.filter((b) => b !== brand)
-                              );
-                            }
-                          }}
+                          checked={brands.includes(brand)}
+                          onChange={() => toggleBrand(brand)}
                         />
                         <span className="ml-2 text-sm">{brand}</span>
                       </label>
                     ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Fuel Type
+                  </label>
+                  <select
+                    aria-label="Fuel type"
+                    value={fuel}
+                    onChange={(e) =>
+                      updateQuery({ fuel: e.target.value || undefined })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Any</option>
+                    {FUEL_TYPES.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Transmission
+                  </label>
+                  <select
+                    aria-label="Transmission"
+                    value={transmission}
+                    onChange={(e) =>
+                      updateQuery({ transmission: e.target.value || undefined })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Any</option>
+                    {TRANSMISSIONS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Year of Manufacture
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1990}
+                      max={new Date().getFullYear()}
+                      placeholder="Min"
+                      aria-label="Minimum year"
+                      value={minYear}
+                      onChange={(e) =>
+                        updateQuery({ minYear: e.target.value || undefined })
+                      }
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                    <span className="text-gray-400">-</span>
+                    <input
+                      type="number"
+                      min={1990}
+                      max={new Date().getFullYear()}
+                      placeholder="Max"
+                      aria-label="Maximum year"
+                      value={maxYear}
+                      onChange={(e) =>
+                        updateQuery({ maxYear: e.target.value || undefined })
+                      }
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Mileage (km)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Min km"
+                      aria-label="Minimum mileage"
+                      value={minKm}
+                      onChange={(e) =>
+                        updateQuery({ minKm: e.target.value || undefined })
+                      }
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                    <span className="text-gray-400">-</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Max km"
+                      aria-label="Maximum mileage"
+                      value={maxKm}
+                      onChange={(e) =>
+                        updateQuery({ maxKm: e.target.value || undefined })
+                      }
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -330,43 +418,55 @@ const index = () => {
           <div className="md:col-span-3">
             <CitySelector
               cities={supportedCities}
-              selectedCity={selectedCity}
+              selectedCity={city}
               locating={locating}
-              onSelectCity={updateCityQuery}
+              onSelectCity={(c) => updateQuery({ city: c || undefined })}
               onUseMyLocation={handleUseMyLocation}
-              onClearCity={() => updateCityQuery("")}
+              onClearCity={() => updateQuery({ city: undefined })}
             />
-            <div className="flex justify-between items-center mb-6">
+
+            {selectedCityInfo && <CityMap city={selectedCityInfo} hubs={hubs} />}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <h1 className="text-2xl font-bold">
-                Used Cars {selectedCity ? `in ${selectedCity}` : "Across India"}
+                Used Cars {city ? `in ${city}` : "Across India"}
               </h1>
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Input
-                    type="text"
-                    placeholder="Search cars..."
-                    className="pl-10"
-                  />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <SearchAutocomplete
+                    value={searchText}
+                    onChange={setSearchText}
+                    onSubmit={handleSearch}
+                    placeholder="Search cars..."
+                    className="w-full"
+                    inputClassName="pl-10"
+                  />
                 </div>
-                <Button
-                  variant="outline"
-                  className="flex items-center  text-white"
-                >
-                  <Sliders className="h-4 w-4 mr-2" />
-                  Sort
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </Button>
+                <div className="relative">
+                  <Sliders className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <select
+                    aria-label="Sort"
+                    value={sort}
+                    onChange={(e) =>
+                      updateQuery({ sort: e.target.value || undefined })
+                    }
+                    className="pl-9 pr-8 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
               </div>
             </div>
 
-            {selectedCityInfo && (
-              <CityMap city={selectedCityInfo} hubs={hubs} />
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {cars === null
-                ? Array.from({ length: 6 }).map((_N_E_STYLE_LOAD, index) => (
+                ? Array.from({ length: 6 }).map((_, index) => (
                     <LoaderCard key={index} />
                   ))
                 : cars.map((car) => (
@@ -424,9 +524,7 @@ const index = () => {
             </div>
             {cars !== null && cars.length === 0 && (
               <p className="text-center text-gray-500 mt-6">
-                {selectedCity
-                  ? `No cars found in ${selectedCity}. Try clearing the city filter.`
-                  : "No cars found."}
+                No cars found. Try adjusting your filters.
               </p>
             )}
           </div>

@@ -1,9 +1,19 @@
 import { Search } from "lucide-react";
+import { useRouter } from "next/router";
 import React, { useState } from "react";
-import { Input } from "../ui/input";
+import SearchAutocomplete from "../search/SearchAutocomplete";
 
 const Hero = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+
+  const handleSearch = (query: string) => {
+    const trimmed = query.trim();
+    router.push(
+      trimmed ? `/buy-car?search=${encodeURIComponent(trimmed)}` : "/buy-car"
+    );
+  };
+
   return (
     <div className="relative h-[500px] w-full">
       {/* Background image */}
@@ -43,16 +53,17 @@ const Hero = () => {
           <div className="grid grid-cols-1 gap-4">
             {/* Search input */}
             <div className="relative">
-              <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+              <div className="flex items-center border border-gray-300 rounded-md">
                 <div className="pl-3">
                   <Search className="h-5 w-5 text-gray-400" />
                 </div>
-                <Input
-                  type="text"
+                <SearchAutocomplete
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={setSearchQuery}
+                  onSubmit={handleSearch}
                   placeholder="Search for your favorite cars"
-                  className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black"
+                  className="flex-1"
+                  inputClassName="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black"
                 />
               </div>
             </div>
@@ -64,3 +75,4 @@ const Hero = () => {
 };
 
 export default Hero;
+
