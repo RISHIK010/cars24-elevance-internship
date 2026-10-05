@@ -1,0 +1,78 @@
+# Node & Next.js
+**/cars24/.next/
+**/cars24/node_modules/
+**/cars24/.env.local
+**/cars24/.env*
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+**/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dotnet
+**/Cars24API/bin/
+**/Cars24API/obj/
+**/Cars24API/appsettings.Development.json
+**/Cars24API/appsettings.*.json
+**/Cars24API/*.user
+**/Cars24API/.vs/
+**/Cars24API/.idea/
+
+# Docker
+**/docker-compose.override.yml
+**/*.pid
+**/Cars24API/*.db
+**/Cars24API/*.db-shm
+**/Cars24API/*.db-wal
+
+# Build artifacts
+**/dist/
+**/out/
+
+# ---------------------------------------------------------
+# Additional hygiene rules (Next.js + .NET monorepo)
+# ---------------------------------------------------------
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# .NET build output
+bin/
+obj/
+
+# Environment variables & local development secrets
+.env
+.env.*
+**/secrets.json
+
+# IDE / editor files
+.idea/
+.vs/
+*.user
+*.suo
+
+# OS temporary files
+desktop.ini
+$RECYCLE.BIN/
+
+# MongoDB / cloud service-account credential files
+**/service-account*.json
+**/serviceAccount*.json
+**/firebase-adminsdk*.json
+**/mongocreds*.json
+**/*.pem
+
+# Keep example config files committed (they must never contain real secrets)
+!**/.env.example
+!**/Cars24API/appsettings.example.json
+
