@@ -218,6 +218,54 @@ const index = () => {
                   <p className="font-medium">{carDetails.specs.insurance}</p>
                 </div>
               </div>
+              {/* Maintenance Estimate */}
+              {carDetails.maintenanceStatus && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <h3 className="font-semibold text-gray-800 mb-2">
+                    Estimated Maintenance
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-sm font-medium ${
+                        carDetails.maintenanceStatus === "High Maintenance Expected"
+                          ? "text-amber-700"
+                          : carDetails.maintenanceStatus === "Moderate Maintenance"
+                          ? "text-blue-700"
+                          : "text-green-700"
+                      }`}
+                    >
+                      {carDetails.maintenanceStatus}
+                    </span>
+                    {carDetails.estimatedMonthlyMaintenance != null && (
+                      <span className="text-sm font-semibold">
+                        ₹{carDetails.estimatedMonthlyMaintenance.toLocaleString(
+                          "en-IN"
+                        )}
+                        /month
+                      </span>
+                    )}
+                  </div>
+                  {carDetails.maintenanceInsights?.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {carDetails.maintenanceInsights.map(
+                        (insight: string, index: number) => (
+                          <li
+                            key={index}
+                            className="text-xs text-gray-600 flex items-center"
+                          >
+                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-2"></div>
+                            {insight}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  )}
+                  <p className="mt-2 text-[10px] text-gray-400">
+                    Estimate based on age, mileage, brand and model. Not a
+                    service quote.
+                  </p>
+                </div>
+              )}
               {/* Highlights */}
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
                 <h3 className="font-semibold text-blue-800 mb-2">

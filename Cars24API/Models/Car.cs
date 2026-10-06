@@ -26,6 +26,16 @@ public class Car
     [BsonIgnore]
     public double? RecommendedPrice { get; set; }
 
+    // Maintenance estimate (deterministic, computed at read time; not persisted).
+    // These mirror the RecommendedPrice pattern: populated when a listing is
+    // served and kept out of MongoDB so stored data is never modified.
+    [BsonIgnore]
+    public double? EstimatedMonthlyMaintenance { get; set; }
+    [BsonIgnore]
+    public string? MaintenanceStatus { get; set; }
+    [BsonIgnore]
+    public List<string> MaintenanceInsights { get; set; } = new List<string>();
+
     public string Emi { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     // Normalized city derived from Location. Optional so that existing

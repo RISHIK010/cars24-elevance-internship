@@ -13,12 +13,14 @@ namespace Cars24API.Controllers
         private readonly LocationService _locationService;
         private readonly CarSearchService _carSearchService;
         private readonly IPricingService _pricingService;
-        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService, IPricingService pricingService)
+        private readonly IMaintenanceService _maintenanceService;
+        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService, IPricingService pricingService, IMaintenanceService maintenanceService)
         {
             _carservice = carService;
             _locationService = locationService;
             _carSearchService = carSearchService;
             _pricingService = pricingService;
+            _maintenanceService = maintenanceService;
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
@@ -31,6 +33,7 @@ namespace Cars24API.Controllers
             // Detail view has no selected city filter, so pricing falls back to
             // the vehicle's own city/location.
             car.RecommendedPrice = _pricingService.RecommendPrice(car, selectedCity: null);
+            ApplyMaintenance(car);
             return Ok(car);
         }
         [HttpGet("summaries")]
@@ -63,23 +66,38 @@ namespace Cars24API.Controllers
                 sort);
 
             var cars = await _carSearchService.SearchAsync(query);
-            var result = cars.Select(car => new
+            var result = cars.Select(car =>
             {
-                id = car.Id,
-                title = car.Title,
-                km = car.Specs.Km,
-                fuel = car.Specs.Fuel,
-                transmission = car.Specs.Transmission,
-                owner = car.Specs.Owner,
-                year = car.Specs.Year,
-                emi = car.Emi,
-                price = car.Price,
-                location = car.Location,
-                city = _locationService.ResolveCarCity(car),
-                image = car.Images.FirstOrDefault() ?? string.Empty,
-                recommendedPrice = _pricingService.RecommendPrice(car, query.City)
+                var maintenance = _maintenanceService.Estimate(car);
+                return new
+                {
+                    id = car.Id,
+                    title = car.Title,
+                    km = car.Specs.Km,
+                    fuel = car.Specs.Fuel,
+                    transmission = car.Specs.Transmission,
+                    owner = car.Specs.Owner,
+                    year = car.Specs.Year,
+                    emi = car.Emi,
+                    price = car.Price,
+                    location = car.Location,
+                    city = _locationService.ResolveCarCity(car),
+                    image = car.Images.FirstOrDefault() ?? string.Empty,
+                    recommendedPrice = _pricingService.RecommendPrice(car, query.City),
+                    estimatedMonthlyMaintenance = maintenance.EstimatedMonthlyMaintenance,
+                    maintenanceStatus = maintenance.MaintenanceStatus,
+                    maintenanceInsights = maintenance.MaintenanceInsights
+                };
             });
             return Ok(result);
+        }
+
+        private void ApplyMaintenance(Car car)
+        {
+            var estimate = _maintenanceService.Estimate(car);
+            car.EstimatedMonthlyMaintenance = estimate.EstimatedMonthlyMaintenance;
+            car.MaintenanceStatus = estimate.MaintenanceStatus;
+            car.MaintenanceInsights = estimate.MaintenanceInsights.ToList();
         }
 
         [HttpGet("suggestions")]

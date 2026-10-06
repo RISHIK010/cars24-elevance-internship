@@ -42,6 +42,9 @@ interface Car {
   recommendedPrice: number | null;
   location: string;
   image: string;
+  estimatedMonthlyMaintenance: number | null;
+  maintenanceStatus: string | null;
+  maintenanceInsights: string[];
 }
 
 function LoaderCard() {
@@ -529,6 +532,29 @@ const index = () => {
                         <div className="mt-2 text-xs text-gray-500">
                           {car.location}
                         </div>
+                        {car.maintenanceStatus && (
+                          <div className="mt-2 text-xs">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded font-medium ${
+                                car.maintenanceStatus === "High Maintenance Expected"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : car.maintenanceStatus === "Moderate Maintenance"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-green-50 text-green-700"
+                              }`}
+                            >
+                              {car.maintenanceStatus}
+                            </span>
+                            {car.estimatedMonthlyMaintenance != null && (
+                              <span className="ml-2 text-gray-500">
+                                Est. ₹{car.estimatedMonthlyMaintenance.toLocaleString(
+                                  "en-IN"
+                                )}
+                                /mo
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </Link>
                   ))}
