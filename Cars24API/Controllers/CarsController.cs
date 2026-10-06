@@ -14,13 +14,15 @@ namespace Cars24API.Controllers
         private readonly CarSearchService _carSearchService;
         private readonly IPricingService _pricingService;
         private readonly IMaintenanceService _maintenanceService;
-        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService, IPricingService pricingService, IMaintenanceService maintenanceService)
+        private readonly INotificationService _notificationService;
+        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService, IPricingService pricingService, IMaintenanceService maintenanceService, INotificationService notificationService)
         {
             _carservice = carService;
             _locationService = locationService;
             _carSearchService = carSearchService;
             _pricingService = pricingService;
             _maintenanceService = maintenanceService;
+            _notificationService = notificationService;
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
@@ -132,6 +134,36 @@ namespace Cars24API.Controllers
             car.CreatedAtUtc = DateTime.UtcNow;
             await _carservice.CreateAsync(car);
             return CreatedAtAction(nameof(GetById), new { id = car.Id }, car);
+        }
+
+        public class PriceUpdateRequest
+        {
+            public string Price { get; set; } = string.Empty;
+        }
+
+        [HttpPut("{id}/price")]
+        public async Task<IActionResult> UpdatePrice(string id, [FromQuery] string? userId, [FromBody] PriceUpdateRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Price))
+            {
+                return BadRequest("A new price is required.");
+            }
+
+            var (car, priceReduced) = await _carservice.UpdatePriceAsync(id, request.Price);
+            if (car is null)
+            {
+                return NotFound();
+            }
+
+            if (priceReduced && !string.IsNullOrWhiteSpace(userId))
+            {
+                await _notificationService.SendPriceDropAsync(
+                    userId,
+                    car.Id,
+                    $"The price of {car.Title} has dropped to {car.Price}.");
+            }
+
+            return Ok(car);
         }
     }
 }

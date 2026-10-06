@@ -16,6 +16,8 @@ builder.Services.AddSingleton<IPricingService, DynamicPricingService>();
 builder.Services.AddSingleton<IMaintenanceService, MaintenanceService>();
 builder.Services.AddSingleton<BookingService>();
 builder.Services.AddSingleton<AppointmentService>();
+builder.Services.AddSingleton<IFcmSender, FcmSender>();
+builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>

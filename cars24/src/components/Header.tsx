@@ -21,6 +21,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { useAuth } from "@/context/AuthContext";
+import NotificationControl from "./NotificationControl";
 const Header = () => {
   const navItems = [
     { name: "Buy used car", href: "/buy-car" },
@@ -97,6 +98,7 @@ const Header = () => {
             <Heart className="mr-1 h-4 w-4" />
             <span>Wishlist</span>
           </Button>
+          <NotificationControl />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

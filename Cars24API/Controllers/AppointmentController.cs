@@ -12,16 +12,18 @@ namespace Cars24API.Controllers
         private readonly AppointmentService _appointmentService;
         private readonly UserService _userService;
         private readonly CarService _carService;
+        private readonly INotificationService _notificationService;
         public class AppointmentDto
         {
             public required Appointment Appointment { get; set; }
             public Car? Car { get; set; }
         }
-        public AppointmentController(AppointmentService appointmentService, UserService userService, CarService carService)
+        public AppointmentController(AppointmentService appointmentService, UserService userService, CarService carService, INotificationService notificationService)
         {
             _appointmentService = appointmentService;
             _userService = userService;
             _carService = carService;
+            _notificationService = notificationService;
         }
         [HttpPost]
         public async Task<IActionResult> CreateAppointment([FromQuery] string userId, [FromBody] Appointment appointment)
@@ -39,6 +41,12 @@ namespace Cars24API.Controllers
             }
             user.AppointmentId.Add(appointment.Id);
             await _userService.UpdateAsync(user.Id, user);
+
+            await _notificationService.SendAppointmentConfirmationAsync(
+                userId,
+                appointment.CarId,
+                "Your appointment has been confirmed.");
+
             return CreatedAtAction(nameof(GetAppointmentById), new { id = appointment.Id }, appointment);
         }
         [HttpGet("{id}")]
