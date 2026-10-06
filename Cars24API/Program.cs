@@ -12,6 +12,7 @@ builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<CarService>();
 builder.Services.AddSingleton<LocationService>();
 builder.Services.AddSingleton<CarSearchService>();
+builder.Services.AddSingleton<IPricingService, DynamicPricingService>();
 builder.Services.AddSingleton<BookingService>();
 builder.Services.AddSingleton<AppointmentService>();
 builder.Services.AddCors(options =>

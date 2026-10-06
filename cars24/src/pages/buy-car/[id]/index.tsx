@@ -174,6 +174,19 @@ const index = () => {
                     {carDetails.price}
                   </p>
                   <p className="text-gray-600">EMI from {carDetails.emi}</p>
+                  {carDetails.recommendedPrice != null && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Recommended Price
+                      </p>
+                      <p className="text-xl font-semibold text-green-600">
+                        ₹{carDetails.recommendedPrice.toLocaleString("en-IN")}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Regional + seasonal estimate
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-gray-600">{carDetails.location}</p>

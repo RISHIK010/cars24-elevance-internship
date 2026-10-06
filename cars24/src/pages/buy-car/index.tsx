@@ -39,6 +39,7 @@ interface Car {
   year: number;
   emi: string;
   price: string;
+  recommendedPrice: number | null;
   location: string;
   image: string;
 }
@@ -513,6 +514,16 @@ const index = () => {
                           <div className="text-right">
                             <div className="text-sm text-gray-600">Price</div>
                             <div className="font-semibold">{car.price}</div>
+                            {car.recommendedPrice != null && (
+                              <div className="mt-1">
+                                <div className="text-xs text-gray-500">
+                                  Recommended Price
+                                </div>
+                                <div className="font-semibold text-green-600">
+                                  ₹{car.recommendedPrice.toLocaleString("en-IN")}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="mt-2 text-xs text-gray-500">

@@ -20,6 +20,12 @@ public class Car
     public List<string> Images { get; set; } = new List<string>();
     public string Title { get; set; } = string.Empty;
     public string Price { get; set; } = string.Empty;
+    // Computed "Recommended Price" produced by the dynamic-pricing engine.
+    // This is populated at read time and is NOT persisted (BsonIgnore keeps it
+    // out of MongoDB), so the stored base Price is never modified.
+    [BsonIgnore]
+    public double? RecommendedPrice { get; set; }
+
     public string Emi { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     // Normalized city derived from Location. Optional so that existing

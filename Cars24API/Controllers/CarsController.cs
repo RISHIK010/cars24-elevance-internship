@@ -12,11 +12,13 @@ namespace Cars24API.Controllers
         private readonly CarService _carservice;
         private readonly LocationService _locationService;
         private readonly CarSearchService _carSearchService;
-        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService)
+        private readonly IPricingService _pricingService;
+        public CarController(CarService carService, LocationService locationService, CarSearchService carSearchService, IPricingService pricingService)
         {
             _carservice = carService;
             _locationService = locationService;
             _carSearchService = carSearchService;
+            _pricingService = pricingService;
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
@@ -26,6 +28,9 @@ namespace Cars24API.Controllers
             {
                 return NotFound();
             }
+            // Detail view has no selected city filter, so pricing falls back to
+            // the vehicle's own city/location.
+            car.RecommendedPrice = _pricingService.RecommendPrice(car, selectedCity: null);
             return Ok(car);
         }
         [HttpGet("summaries")]
@@ -71,7 +76,8 @@ namespace Cars24API.Controllers
                 price = car.Price,
                 location = car.Location,
                 city = _locationService.ResolveCarCity(car),
-                image = car.Images.FirstOrDefault() ?? string.Empty
+                image = car.Images.FirstOrDefault() ?? string.Empty,
+                recommendedPrice = _pricingService.RecommendPrice(car, query.City)
             });
             return Ok(result);
         }
