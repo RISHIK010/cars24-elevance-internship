@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Cars24API.Models;
 using Cars24API.Services;
 using BCrypt.Net;
+using System.ComponentModel.DataAnnotations;
 
 namespace Cars24API.Controllers;
 
@@ -10,9 +11,11 @@ namespace Cars24API.Controllers;
 public class UserAuthController : ControllerBase
 {
     private readonly UserService _userService;
-    public UserAuthController(UserService userService)
+    private readonly ReferralService _referralService;
+    public UserAuthController(UserService userService, ReferralService referralService)
     {
         _userService = userService;
+        _referralService = referralService;
     }
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUserById(string id)
@@ -24,14 +27,42 @@ public class UserAuthController : ControllerBase
         return Ok(user);
     }
     [HttpPost("signup")]
-    public async Task<IActionResult> Signup([FromBody] User user)
+    public async Task<IActionResult> Signup([FromBody] SignupRequest request)
     {
-        var existingUser = await _userService.GetByEmailAsync(user.Email);
+        if (request == null || string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.FullName))
+            return BadRequest(new { message = "Full name, email and password are required." });
+
+        var existingUser = await _userService.GetByEmailAsync(request.Email);
         if (existingUser != null)
             return BadRequest(new { message = "User already exists." });
 
-        user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
+        string? referralCode = string.IsNullOrWhiteSpace(request.ReferralCode)
+            ? null
+            : request.ReferralCode.Trim().ToUpperInvariant();
+
+        User? referrer = null;
+        if (referralCode != null)
+        {
+            referrer = await _referralService.GetUserByReferralCodeAsync(referralCode);
+            if (referrer == null)
+                return BadRequest(new { message = "Invalid referral code." });
+        }
+
+        var user = new User
+        {
+            FullName = request.FullName,
+            Email = request.Email,
+            Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Phone = request.Phone ?? string.Empty,
+            ReferralCode = await _referralService.GenerateUniqueReferralCodeAsync()
+        };
         await _userService.CreateAsync(user);
+
+        if (referrer != null && referrer.Id != user.Id)
+        {
+            await _referralService.AttachAsync(user.Id!, referralCode!, referrer.Id!);
+        }
 
         return Ok(new
         {
@@ -41,9 +72,28 @@ public class UserAuthController : ControllerBase
                 id = user.Id, // MongoDB-generated ObjectId
                 fullName = user.FullName,
                 email = user.Email,
-                phone = user.Phone
+                phone = user.Phone,
+                referralCode = user.ReferralCode
             }
         });
+    }
+
+    public class SignupRequest
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Phone]
+        public string? Phone { get; set; }
+
+        public string? ReferralCode { get; set; }
     }
 
     [HttpPost("login")]

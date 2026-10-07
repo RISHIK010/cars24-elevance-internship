@@ -1,4 +1,4 @@
-import { Bell, Calendar, Car, LogOut, Mail, Settings, User } from "lucide-react";
+import { Bell, Calendar, Car, LogOut, Mail, Settings, User, Wallet } from "lucide-react";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 
@@ -86,6 +86,14 @@ const index = () => {
                     >
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <span>Appointments</span>
+                    </button>
+
+                    <button
+                      onClick={() => router.push("/wallet")}
+                      className="w-full flex items-center space-x-2 p-3 text-left rounded-lg hover:bg-gray-50"
+                    >
+                      <Wallet className="w-5 h-5 text-gray-400" />
+                      <span>Referral & Wallet</span>
                     </button>
 
                     <button

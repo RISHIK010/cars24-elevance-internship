@@ -5,7 +5,7 @@ const BASE_URL = `${API_BASE_URL}/api/UserAuth`;
 export const signup = async (
   email: string,
   password: string,
-  userData: { fullName: string; phone: string }
+  userData: { fullName: string; phone: string; referralCode?: string }
 ) => {
   const response = await fetch(`${BASE_URL}/signup`, {
     method: "POST",
@@ -14,10 +14,11 @@ export const signup = async (
     },
     body: JSON.stringify({ email, password, ...userData }),
   });
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error("Failed to sign up");
+    throw new Error((data as any)?.message ?? "Failed to sign up");
   }
-  return response.json();
+  return data;
 };
 
 export const login = async (email: string, password: string) => {

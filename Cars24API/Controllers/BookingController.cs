@@ -13,17 +13,19 @@ namespace Cars24API.Controllers
         private readonly UserService _userService;
         private readonly CarService _carService;
         private readonly INotificationService _notificationService;
+        private readonly ReferralService _referralService;
         public class bookingDto
         {
             public required Booking Booking { get; set; }
             public Car? Car { get; set; }
         }
-        public BookingController(BookingService bookingService, UserService userService, CarService carService, INotificationService notificationService)
+        public BookingController(BookingService bookingService, UserService userService, CarService carService, INotificationService notificationService, ReferralService referralService)
         {
             _bookingService = bookingService;
             _userService = userService;
             _carService = carService;
             _notificationService = notificationService;
+            _referralService = referralService;
         }
         [HttpPost]
         public async Task<IActionResult> CreateAppointment([FromQuery] string userId, [FromBody] Booking booking)
@@ -41,6 +43,8 @@ namespace Cars24API.Controllers
             }
             user.BookingId.Add(booking.Id);
             await _userService.UpdateAsync(user.Id, user);
+
+            await _referralService.TryGrantReferralRewardAsync(userId, booking.Id!);
 
             await _notificationService.SendAppointmentConfirmationAsync(
                 userId,

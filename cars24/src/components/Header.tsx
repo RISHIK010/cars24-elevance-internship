@@ -10,6 +10,7 @@ import {
   Heart,
   User,
   ChevronDown,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -33,6 +34,7 @@ const Header = () => {
   const menuItems = [
     { label: "My Appointments", icon: Calendar, link: "/appointments" },
     { label: "My Bookings", icon: Package, link: "/bookings" },
+    { label: "Referral & Wallet", icon: Wallet, link: "/wallet" },
     { label: "My Orders", icon: FileText, link: "/orders" },
     { label: "Resources", icon: FileText, link: "/resources" },
     { label: "RC Transfer Status", icon: FileText, link: "/rc-transfer" },

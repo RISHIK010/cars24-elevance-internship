@@ -24,6 +24,8 @@ public class User
     [Phone]
     public string Phone { get; set; } = string.Empty;
 
+    public string? ReferralCode { get; set; }
+
     [BsonRepresentation(BsonType.ObjectId)]
 
     public List<string> BookingId { get; set; } = new List<string>();

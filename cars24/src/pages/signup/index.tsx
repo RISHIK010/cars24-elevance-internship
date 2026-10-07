@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { AlertCircle, Lock, Mail, Phone, User } from "lucide-react";
+import { AlertCircle, Gift, Lock, Mail, Phone, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
@@ -14,6 +14,7 @@ const index = () => {
     confirmPassword: "",
     fullName: "",
     phone: "",
+    referralCode: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,7 @@ const index = () => {
       await signUp(formData.email, formData.password, {
         fullName: formData.fullName,
         phone: formData.phone,
+        referralCode: formData.referralCode.trim() || undefined,
       });
       toast.success("Account created successfully!");
       navigate.push("/");
@@ -160,6 +162,29 @@ const index = () => {
                 onChange={handleChange}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="+1 (555) 000-0000"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="referralCode"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Referral Code (optional)
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Gift className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                id="referralCode"
+                name="referralCode"
+                type="text"
+                value={formData.referralCode}
+                onChange={handleChange}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="C24ABC123"
               />
             </div>
           </div>

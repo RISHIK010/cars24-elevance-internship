@@ -18,6 +18,8 @@ builder.Services.AddSingleton<BookingService>();
 builder.Services.AddSingleton<AppointmentService>();
 builder.Services.AddSingleton<IFcmSender, FcmSender>();
 builder.Services.AddSingleton<INotificationService, NotificationService>();
+builder.Services.AddSingleton<WalletService>();
+builder.Services.AddSingleton<ReferralService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
