@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, parseResponse } from "@/lib/api";
 
 const BASE_URL = `${API_BASE_URL}/api/Appointment`;
 
@@ -10,7 +10,7 @@ export const createAppointment = async (userid: string, appointment: any) => {
     },
     body: JSON.stringify(appointment),
   });
-  return response.json();
+  return parseResponse(response, "Failed to create appointment");
 };
 
 export const getAppointmentbyid = async (id: string) => {
@@ -19,5 +19,5 @@ export const getAppointmentbyid = async (id: string) => {
 };
 export const getappointmentbyuser = async (userId:string) => {
   const response = await fetch(`${BASE_URL}/user/${userId}/appointments`);
-  return response.json();
+  return parseResponse(response, "Failed to fetch appointments");
 };

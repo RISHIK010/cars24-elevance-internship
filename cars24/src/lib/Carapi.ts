@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, parseResponse } from "@/lib/api";
 
 const BASE_URL = `${API_BASE_URL}/api/Car`;
 
@@ -31,7 +31,7 @@ export const createCar = async (carDetails: CarDetails) => {
 };
 export const getcarByid = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`);
-  return response.json();
+  return parseResponse(response, "Failed to fetch car");
 };
 
 export type CarSearchParams = {
@@ -65,7 +65,7 @@ export const getcarSummaries = async (params: CarSearchParams = {}) => {
   const qs = query.toString();
   const url = qs ? `${BASE_URL}/summaries?${qs}` : `${BASE_URL}/summaries`;
   const response = await fetch(url);
-  return response.json();
+  return parseResponse(response, "Failed to fetch car summaries");
 };
 
 export type CarSuggestion = {

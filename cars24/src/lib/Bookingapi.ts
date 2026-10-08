@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, parseResponse } from "@/lib/api";
 
 const BASE_URL = `${API_BASE_URL}/api/Booking`;
 
@@ -10,7 +10,7 @@ export const createBooking = async (userid: string, Booking: any) => {
     },
     body: JSON.stringify(Booking),
   });
-  return response.json();
+  return parseResponse(response, "Failed to create booking");
 };
 
 export const getBookingbyid = async (id: string) => {
@@ -19,5 +19,5 @@ export const getBookingbyid = async (id: string) => {
 };
 export const getBookingbyuser = async (userId: string) => {
   const response = await fetch(`${BASE_URL}/user/${userId}/bookings`);
-  return response.json();
+  return parseResponse(response, "Failed to fetch bookings");
 };

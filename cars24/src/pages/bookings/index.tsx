@@ -144,7 +144,14 @@ const PurchasedCarsPage = () => {
     );
   }
   const formatPrice = (price: string) => {
-    return "₹ " + parseInt(price).toLocaleString("en-IN");
+    if (!price) return "₹ 0";
+    // Keep human-readable Indian price strings (e.g. "₹7.80 lakh") as-is.
+    if (/\b(lakh|crore)\b/i.test(price)) {
+      return price.startsWith("₹") ? price : `₹ ${price}`;
+    }
+    const digits = String(price).replace(/[^\d]/g, "");
+    const numeric = digits ? parseInt(digits, 10) : 0;
+    return `₹ ${numeric.toLocaleString("en-IN")}`;
   };
 
   return (
@@ -395,7 +402,7 @@ const PurchasedCarsPage = () => {
                     <Landmark className="w-5 h-5 mr-3 text-blue-600" />
                     <div>
                       <p className="text-sm text-gray-500">Financing</p>
-                      <p className="text-gray-800 font-medium">{data.booking.loanStatus}</p>
+                      <p className="text-gray-800 font-medium">{data.booking.loanRequired}</p>
                     </div>
                   </div>
                 </div>

@@ -52,13 +52,34 @@ const BookAppointmentPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error("Pleasde login to continue");
+      toast.error("Please login to continue");
       return;
     }
-    toast.error("Failed to list Appointmets");
-    // Here you would typically send the data to your backend
-    console.log("Appointment Data:", formData);
-    // navigate('/booking-success');
+    if (!id) {
+      toast.error("Car information is missing");
+      return;
+    }
+    try {
+      const appointment = {
+        carId: id as string,
+        scheduledDate: formData.scheduledDate,
+        scheduledTime: formData.scheduledTime,
+        location: formData.location,
+        appointmentType: formData.appointmentType,
+        notes: formData.notes,
+      };
+      const response = await createAppointment(user.id, appointment);
+      if (response.id) {
+        toast.success("Appointment booked successfully");
+        router.push("/appointments");
+      } else {
+        toast.error("Failed to book appointment");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to book appointment";
+      toast.error(message);
+    }
   };
 
   return (

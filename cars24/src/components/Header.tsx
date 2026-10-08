@@ -1,16 +1,13 @@
 import React, { useState } from "react";
 import {
-  Car,
   Calendar,
   Package,
-  FileText,
-  HelpCircle,
-  Users,
   Menu,
   Heart,
   User,
   ChevronDown,
   Wallet,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -27,19 +24,11 @@ const Header = () => {
   const navItems = [
     { name: "Buy used car", href: "/buy-car" },
     { name: "Sell car", href: "/sell-car" },
-    { name: "Car finance", href: "/finance" },
-    { name: "New cars", href: "/new-cars" },
-    { name: "Car services", href: "/services" },
   ];
   const menuItems = [
     { label: "My Appointments", icon: Calendar, link: "/appointments" },
     { label: "My Bookings", icon: Package, link: "/bookings" },
     { label: "Referral & Wallet", icon: Wallet, link: "/wallet" },
-    { label: "My Orders", icon: FileText, link: "/orders" },
-    { label: "Resources", icon: FileText, link: "/resources" },
-    { label: "RC Transfer Status", icon: FileText, link: "/rc-transfer" },
-    { label: "Become Our Partner", icon: Users, link: "/partner" },
-    { label: "FAQ", icon: HelpCircle, link: "/faq" },
   ];
   // const user = {
   //   id: "1",
@@ -72,11 +61,17 @@ const Header = () => {
         <div className="flex lg:hidden">
           <button
             type="button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
             className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            <span className="sr-only">Open main menu</span>
-            <Menu className="h-6 w-6" aria-hidden="true" />
+            <span className="sr-only">Toggle main menu</span>
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <Menu className="h-6 w-6" aria-hidden="true" />
+            )}
           </button>
         </div>
         <div className="hidden lg:flex lg:gap-x-8">
@@ -177,6 +172,69 @@ const Header = () => {
           </DropdownMenu>
         </div>
       </nav>
+
+      {mobileMenuOpen && (
+        <div
+          id="mobile-menu"
+          className="lg:hidden border-t border-gray-200 bg-white"
+        >
+          <div className="space-y-1 px-4 pb-4 pt-2">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="block rounded-md px-3 py-2 text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-blue-600"
+              >
+                {item.name}
+              </Link>
+            ))}
+            {menuItems.map(({ label, icon: Icon, link }) => (
+              <Link
+                key={label}
+                href={link}
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-blue-600"
+              >
+                <Icon className="h-5 w-5 text-gray-500" />
+                {label}
+              </Link>
+            ))}
+            <div className="my-2 border-t border-gray-200" />
+            {user ? (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium text-gray-900 hover:bg-gray-50"
+                >
+                  <User className="h-5 w-5 text-gray-500" />
+                  Profile Settings
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    signOut();
+                  }}
+                  className="w-full rounded-md px-3 py-2 text-left text-base font-medium text-red-600 hover:bg-gray-50"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium text-gray-900 hover:bg-gray-50"
+              >
+                <User className="h-5 w-5 text-gray-500" />
+                Login / Sign Up
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
