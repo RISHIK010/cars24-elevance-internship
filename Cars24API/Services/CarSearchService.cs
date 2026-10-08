@@ -48,13 +48,32 @@ namespace Cars24API.Services
                     continue;
                 }
 
-                // When there is no keyword search we preserve the original listing
-                // order (score stays 0) unless an explicit sort is requested.
-                var score = hasSearch ? ComputeRelevance(car, query, tokens) : 0;
-                scored.Add((car, score));
+                if (hasSearch)
+                {
+                    // A keyword search must actually match the vehicle; never
+                    // surface every listing just because a search term exists.
+                    var keyword = ScoreKeywords(car, tokens);
+                    if (keyword <= 0)
+                    {
+                        continue;
+                    }
+
+                    scored.Add((car, ComputeRelevance(car, query, keyword)));
+                }
+                else
+                {
+                    // No keyword search: preserve the original listing order.
+                    scored.Add((car, 0));
+                }
             }
 
-            return ApplySort(scored, query, hasSearch).Select(x => x.Car).ToList();
+            // Guarantee one result per unique car so the UI never renders
+            // duplicate cards for the same vehicle.
+            return ApplySort(scored, query, hasSearch)
+                .Select(x => x.Car)
+                .GroupBy(c => c.Id)
+                .Select(g => g.First())
+                .ToList();
         }
 
         // Builds a small, real-data suggestion corpus for predictive search.
@@ -63,16 +82,13 @@ namespace Cars24API.Services
             var suggestions = new List<CarSuggestion>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var city in _locationService.GetSupportedCities())
-            {
-                AddSuggestion(suggestions, seen, city.Name, "City");
-            }
-
+            // Suggestions are derived exclusively from the car catalogue so the
+            // search box surfaces vehicles (title/brand/model) rather than
+            // cities or other non-vehicle terms.
             var cars = await _carService.GetAllAsync();
             foreach (var car in cars)
             {
-                AddSuggestion(suggestions, seen, car.Specs.Fuel, "Fuel");
-                AddSuggestion(suggestions, seen, car.Specs.Transmission, "Transmission");
+                AddSuggestion(suggestions, seen, car.Title, "Vehicle");
 
                 var (brand, model) = ExtractBrandModel(car.Title);
                 AddSuggestion(suggestions, seen, brand, "Brand");
@@ -229,14 +245,13 @@ namespace Cars24API.Services
         }
         // ============================= scoring =============================
 
-        private double ComputeRelevance(Car car, CarSearchQuery query, List<string> tokens)
+        private double ComputeRelevance(Car car, CarSearchQuery query, double keywordScore)
         {
             // Conceptual priority: keyword >> filter alignment >> popularity >> recency.
-            var keyword = ScoreKeywords(car, tokens);
             var filter = ScoreFilterAlignment(car, query);
             var popularity = ScorePopularity(car);
             var recency = ScoreRecency(car);
-            return keyword + filter + popularity + recency;
+            return keywordScore + filter + popularity + recency;
         }
 
         private double ScoreKeywords(Car car, List<string> tokens)
