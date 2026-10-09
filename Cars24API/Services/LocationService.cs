@@ -15,6 +15,7 @@ namespace Cars24API.Services
             new SupportedCity("Mumbai", 19.0760, 72.8777),
             new SupportedCity("Bangalore", 12.9716, 77.5946),
             new SupportedCity("Hyderabad", 17.3850, 78.4867),
+            new SupportedCity("Vijayawada", 16.5062, 80.6480),
             new SupportedCity("Chennai", 13.0827, 80.2707),
             new SupportedCity("Kolkata", 22.5726, 88.3639),
             new SupportedCity("Pune", 18.5204, 73.8567),
@@ -29,6 +30,7 @@ namespace Cars24API.Services
                 ["New Delhi"] = new[] { "delhi", "ncr" },
                 ["Mumbai"] = new[] { "bombay" },
                 ["Bangalore"] = new[] { "bengaluru" },
+                ["Vijayawada"] = new[] { "bezawada", "bejawada" },
             };
 
         // Small finite seed catalogue of service centers / pickup hubs.
