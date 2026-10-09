@@ -392,9 +392,17 @@ namespace Cars24API.Services
             if (token.Length >= 4)
             {
                 var maxDistance = token.Length <= 5 ? 1 : 2;
-                if (LevenshteinDistance(token, field) <= maxDistance)
+                // A field can hold several words (e.g. the title "maruti 800").
+                // Compare the token against each word individually so a single-term
+                // typo such as "mazuti" still fuzzy-matches "maruti" instead of being
+                // measured against the whole "maruti 800" string (which inflates the
+                // edit distance and defeats typo tolerance).
+                foreach (var word in field.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    return MatchTier.Fuzzy;
+                    if (word.Length >= 4 && LevenshteinDistance(token, word) <= maxDistance)
+                    {
+                        return MatchTier.Fuzzy;
+                    }
                 }
             }
 
