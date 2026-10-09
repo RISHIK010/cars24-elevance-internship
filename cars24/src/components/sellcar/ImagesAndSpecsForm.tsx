@@ -3,13 +3,15 @@ import {
   Fuel,
   Gauge,
   Plus,
+  RefreshCw,
   Settings,
   Shield,
   Upload,
   User,
   X,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 type CarDetails = {
   id: string;
   title: string;
@@ -43,11 +45,14 @@ const ImagesAndSpecsForm: React.FC<ImagesAndSpecsFormProps> = ({
 }) => {
   const [isValid, setIsValid] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceIndexRef = useRef<number | null>(null);
 
-  const placeholderImages = [
-    "https://images.pexels.com/photos/112460/pexels-photo-112460.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  ];
+  const MAX_IMAGES = 10;
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB per original upload
+  const MAX_DIMENSION = 1280; // longest edge after resizing
+  const JPEG_QUALITY = 0.82;
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
   useEffect(() => {
     const { specs } = carDetails;
@@ -63,16 +68,123 @@ const ImagesAndSpecsForm: React.FC<ImagesAndSpecsFormProps> = ({
     setIsValid(!!specsFilled && hasImages);
   }, [carDetails]);
 
-  // In a real implementation, this would handle file uploads
-  const handleImageUpload = () => {
-    // Simulating image upload by using placeholder images
-    if (carDetails.images.length < 10) {
-      const randomImage =
-        placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  // Downscale and re-encode the selected image so it persists compactly in the
+  // Car.Images list instead of blowing past Mongo's 16 MB document limit.
+  const compressImage = (dataUrl: string): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(
+            1,
+            MAX_DIMENSION / Math.max(img.width, img.height)
+          );
+          const width = Math.max(1, Math.round(img.width * scale));
+          const height = Math.max(1, Math.round(img.height * scale));
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          // Fill white so transparent PNG/WebP frames don't render black.
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => reject(new Error("Unsupported or corrupted image"));
+      img.src = dataUrl;
+    });
+
+  const validateFile = (file: File): string | null => {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return `${file.name} is not a supported image. Use JPEG, PNG, or WebP.`;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return `${file.name} exceeds the 10 MB size limit.`;
+    }
+    return null;
+  };
+
+  const openFilePicker = (replaceIndex: number | null = null) => {
+    replaceIndexRef.current = replaceIndex;
+    fileInputRef.current?.click();
+  };
+
+  const processFiles = async (fileList: FileList | File[]) => {
+    const replaceIndex = replaceIndexRef.current;
+    const allFiles = Array.from(fileList);
+    const slotsLeft =
+      replaceIndex !== null ? 1 : MAX_IMAGES - carDetails.images.length;
+
+    if (slotsLeft <= 0) {
+      toast.error(
+        replaceIndex !== null
+          ? "No image selected to replace."
+          : `You can add up to ${MAX_IMAGES} photos.`
+      );
+      return;
+    }
+
+    const files = allFiles.slice(0, slotsLeft);
+    if (allFiles.length > slotsLeft) {
+      toast.error(
+        replaceIndex !== null
+          ? "Select a single image to replace the current one."
+          : `You can add up to ${MAX_IMAGES} photos.`
+      );
+    }
+
+    const processed: string[] = [];
+    for (const file of files) {
+      const validationError = validateFile(file);
+      if (validationError) {
+        toast.error(validationError);
+        continue;
+      }
+      try {
+        const original = await readFileAsDataUrl(file);
+        const compressed = await compressImage(original);
+        processed.push(compressed);
+      } catch {
+        toast.error(`Could not process ${file.name}.`);
+      }
+    }
+
+    if (processed.length === 0) return;
+
+    if (replaceIndex !== null) {
+      const updated = [...carDetails.images];
+      updated[replaceIndex] = processed[0];
+      updateCarDetails({ images: updated });
+    } else {
       updateCarDetails({
-        images: [...carDetails.images, randomImage],
+        images: [...carDetails.images, ...processed].slice(0, MAX_IMAGES),
       });
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+    }
+    // Reset so the same file can be picked again after removal/replacement.
+    e.target.value = "";
   };
 
   const removeImage = (index: number) => {
@@ -137,22 +249,34 @@ const ImagesAndSpecsForm: React.FC<ImagesAndSpecsFormProps> = ({
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={(e) => {
-            handleDrag(e);
-            handleImageUpload();
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              processFiles(e.dataTransfer.files);
+            }
           }}
         >
           <Upload className="h-10 w-10 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600">Drag photos here or</p>
           <button
             type="button"
-            onClick={handleImageUpload}
+            onClick={() => openFilePicker()}
             className="mt-2 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Browse Files
           </button>
           <p className="text-xs text-gray-500 mt-2">
-            Add up to 10 photos (JPEG or PNG)
+            Add up to 10 photos (JPEG, PNG, or WebP)
           </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+          />
         </div>
         {carDetails.images.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4">
@@ -166,10 +290,19 @@ const ImagesAndSpecsForm: React.FC<ImagesAndSpecsFormProps> = ({
                   alt={`Car preview ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openFilePicker(index)}
+                    title="Replace photo"
+                    className="p-1.5 bg-white text-gray-700 rounded-full hover:bg-gray-100"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
+                    title="Remove photo"
                     className="p-1.5 bg-red-600 text-white rounded-full"
                   >
                     <X className="h-4 w-4" />
@@ -185,7 +318,7 @@ const ImagesAndSpecsForm: React.FC<ImagesAndSpecsFormProps> = ({
             {carDetails.images.length < 10 && (
               <button
                 type="button"
-                onClick={handleImageUpload}
+                onClick={() => openFilePicker()}
                 className="aspect-video flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <Plus className="h-6 w-6 text-gray-400" />

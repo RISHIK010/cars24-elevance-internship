@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { createBooking } from "@/lib/Bookingapi";
 import { getcarByid } from "@/lib/Carapi";
+import { CAR_IMAGE_PLACEHOLDER } from "@/lib/carImagePlaceholder";
 import {
   AlertCircle,
   Calendar,
@@ -158,7 +159,7 @@ const index = () => {
               {/* Car Image */}
               <div className="aspect-w-16 aspect-h-9 mb-4">
                 <img
-                  src={carDetails.images[0]}
+                  src={carDetails.images[0] || CAR_IMAGE_PLACEHOLDER}
                   alt={carDetails.title}
                   className="w-full h-64 object-cover rounded-lg"
                 />

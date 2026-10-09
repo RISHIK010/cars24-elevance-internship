@@ -11,6 +11,7 @@ import {
   SupportedCity,
 } from "@/lib/Carapi";
 import { findNearestCity } from "@/lib/geo";
+import { CAR_IMAGE_PLACEHOLDER } from "@/lib/carImagePlaceholder";
 import { ChevronDown, Heart, Search, Sliders } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -481,7 +482,7 @@ const index = () => {
                     >
                       <div className="relative h-48">
                         <img
-                          src={car.image}
+                          src={car.image || CAR_IMAGE_PLACEHOLDER}
                           alt={car.title}
                           className="w-full h-full object-cover"
                         />
