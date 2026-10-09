@@ -74,11 +74,14 @@ public class FcmSender : IFcmSender
                         ["body"] = payload.Body,
                         ["vehicleId"] = payload.VehicleId ?? string.Empty,
                         ["actionUrl"] = payload.ActionUrl ?? string.Empty
-                    },
-                    FcmOptions = new WebpushFcmOptions
-                    {
-                        Link = string.IsNullOrWhiteSpace(payload.ActionUrl) ? null : payload.ActionUrl
                     }
+                    // NOTE: WebpushFcmOptions.Link is intentionally omitted. The Admin
+                    // SDK validates Link and throws unless it is an absolute HTTPS URL,
+                    // but ActionUrl here is an app-relative path (e.g. "/buy-car/{id}").
+                    // Setting Link caused every send to fail validation and be swallowed
+                    // silently. Navigation is handled by the service worker's
+                    // notificationclick handler and the frontend onMessage handler, which
+                    // read the "actionUrl" entry from Data above.
                 }
             };
 
