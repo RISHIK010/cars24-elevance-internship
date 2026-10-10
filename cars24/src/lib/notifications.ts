@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, parseResponse } from "@/lib/api";
 
 const BASE_URL = `${API_BASE_URL}/api/Notification`;
 
@@ -29,8 +29,7 @@ export const registerDevice = async (payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to register notification device");
-  return response.json();
+  return parseResponse(response, "Failed to register notification device");
 };
 
 export const unregisterDevice = async (userId: string, deviceId: string) => {

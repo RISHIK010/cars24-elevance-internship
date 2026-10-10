@@ -100,7 +100,11 @@ export async function enableNotifications(): Promise<{
 
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
-    throw new Error(permission === "denied" ? "denied" : "default");
+    throw new Error(
+      permission === "denied"
+        ? "Notifications are blocked in your browser. Allow them in your browser settings and try again."
+        : "Notification permission was not granted. Please allow notifications and try again."
+    );
   }
 
   const app = await getApp();

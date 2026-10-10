@@ -51,6 +51,7 @@ const NotificationControl = () => {
   const [busy, setBusy] = useState(false);
   const [preferences, setPreferences] =
     useState<NotificationPreferences>(defaultPreferences);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -106,6 +107,7 @@ const NotificationControl = () => {
   const handleEnable = async () => {
     if (!user) return;
     setBusy(true);
+    setLastError(null);
     try {
       const { token, deviceId } = await enableNotifications();
       await registerDevice({
@@ -117,11 +119,14 @@ const NotificationControl = () => {
       localStorage.setItem(ENABLED_KEY, "true");
       setStatus("enabled");
       toast.success("Notifications enabled");
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error";
       if (getCurrentPermission() === "denied") setStatus("denied");
       else if (!isFirebaseConfigured()) setStatus("unconfigured");
       else setStatus("error");
-      toast.error("Could not enable notifications");
+      setLastError(message);
+      toast.error(message || "Could not enable notifications");
     } finally {
       setBusy(false);
     }
@@ -220,7 +225,8 @@ const NotificationControl = () => {
               )}
               {status === "error" && (
                 <p className="text-sm text-red-600">
-                  Something went wrong. Please try enabling again.
+                  {lastError ||
+                    "Something went wrong. Please try enabling again."}
                 </p>
               )}
 
