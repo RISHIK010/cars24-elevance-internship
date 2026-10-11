@@ -11,6 +11,7 @@ import {
   isFirebaseConfigured,
   isNotificationSupported,
   onForegroundMessage,
+  refreshRegistrationToken,
 } from "@/lib/firebase";
 import {
   defaultPreferences,
@@ -71,14 +72,44 @@ const NotificationControl = () => {
         return;
       }
 
-      const enabled = localStorage.getItem(ENABLED_KEY) === "true";
-      setStatus(enabled ? "enabled" : "disabled");
-
+      // Load saved preferences before reconciling so a re-registration never
+      // overwrites the user's stored preferences with defaults.
+      let loadedPreferences: NotificationPreferences | null = null;
       try {
-        const stored = await getPreferences(user!.id);
-        if (!cancelled && stored) setPreferences(stored);
+        loadedPreferences = await getPreferences(user!.id);
+        if (!cancelled && loadedPreferences) setPreferences(loadedPreferences);
       } catch {
         // Keep local defaults if preferences cannot be loaded.
+      }
+      if (cancelled) return;
+
+      // A saved flag alone is never proof that browser push is registered.
+      // Only reconcile when the browser permission is already granted, and
+      // never prompt for permission automatically on page load.
+      const storedEnabled = localStorage.getItem(ENABLED_KEY) === "true";
+      if (!storedEnabled || getCurrentPermission() !== "granted") {
+        setStatus("disabled");
+        return;
+      }
+
+      try {
+        const { token, deviceId } = await refreshRegistrationToken();
+        await registerDevice({
+          userId: user!.id,
+          deviceId,
+          registrationToken: token,
+          preferences: loadedPreferences ?? defaultPreferences,
+        });
+        if (cancelled) return;
+        localStorage.setItem(ENABLED_KEY, "true");
+        setStatus("enabled");
+      } catch (error) {
+        if (cancelled) return;
+        localStorage.removeItem(ENABLED_KEY);
+        setLastError(
+          error instanceof Error ? error.message : "Unknown error"
+        );
+        setStatus("error");
       }
     }
 
@@ -122,6 +153,7 @@ const NotificationControl = () => {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown error";
+      localStorage.removeItem(ENABLED_KEY);
       if (getCurrentPermission() === "denied") setStatus("denied");
       else if (!isFirebaseConfigured()) setStatus("unconfigured");
       else setStatus("error");

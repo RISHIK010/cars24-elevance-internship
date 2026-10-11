@@ -89,24 +89,10 @@ async function getApp(): Promise<FirebaseApp> {
   return appPromise;
 }
 
-export async function enableNotifications(): Promise<{
+async function acquireRegistrationToken(): Promise<{
   token: string;
   deviceId: string;
 }> {
-  if (typeof window === "undefined") throw new Error("Not in a browser");
-  if (!isNotificationSupported())
-    throw new Error("Notifications are not supported in this browser");
-  if (!isFirebaseConfigured()) throw new Error("Firebase is not configured");
-
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    throw new Error(
-      permission === "denied"
-        ? "Notifications are blocked in your browser. Allow them in your browser settings and try again."
-        : "Notification permission was not granted. Please allow notifications and try again."
-    );
-  }
-
   const app = await getApp();
   const { getMessaging, getToken, isSupported } = await import(
     "firebase/messaging"
@@ -129,6 +115,46 @@ export async function enableNotifications(): Promise<{
 
   const deviceId = getOrCreateDeviceId();
   return { token, deviceId };
+}
+
+export async function enableNotifications(): Promise<{
+  token: string;
+  deviceId: string;
+}> {
+  if (typeof window === "undefined") throw new Error("Not in a browser");
+  if (!isNotificationSupported())
+    throw new Error("Notifications are not supported in this browser");
+  if (!isFirebaseConfigured()) throw new Error("Firebase is not configured");
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error(
+      permission === "denied"
+        ? "Notifications are blocked in your browser. Allow them in your browser settings and try again."
+        : "Notification permission was not granted. Please allow notifications and try again."
+    );
+  }
+
+  return acquireRegistrationToken();
+}
+
+// Refreshes the current FCM token without prompting for permission. Only call
+// this when the browser notification permission is already granted; it never
+// shows a permission prompt, so it is safe to run during page-load
+// reconciliation.
+export async function refreshRegistrationToken(): Promise<{
+  token: string;
+  deviceId: string;
+}> {
+  if (typeof window === "undefined") throw new Error("Not in a browser");
+  if (!isNotificationSupported())
+    throw new Error("Notifications are not supported in this browser");
+  if (!isFirebaseConfigured()) throw new Error("Firebase is not configured");
+  if (getCurrentPermission() !== "granted") {
+    throw new Error("Notification permission is not granted.");
+  }
+
+  return acquireRegistrationToken();
 }
 
 export async function disableNotifications(): Promise<void> {
