@@ -88,10 +88,6 @@ const NotificationControl = () => {
       // never prompt for permission automatically on page load.
       const storedEnabled = localStorage.getItem(ENABLED_KEY) === "true";
       if (!storedEnabled || getCurrentPermission() !== "granted") {
-        // A stale flag must never outlive the permission it represents, or a
-        // later page load could skip the prompt while the browser has reverted
-        // to "default"/"ask".
-        if (storedEnabled) localStorage.removeItem(ENABLED_KEY);
         setStatus("disabled");
         return;
       }

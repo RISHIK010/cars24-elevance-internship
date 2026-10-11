@@ -37,7 +37,6 @@ export const login = async (email: string, password: string) => {
 
 export const getUserById = async (userId: string) => {
   const response = await fetch(`${BASE_URL}/${userId}`);
-  if (response.status === 404) return null;
   if (!response.ok) {
     throw new Error("Failed to fetch user");
   }
