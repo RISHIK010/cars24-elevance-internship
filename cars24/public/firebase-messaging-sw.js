@@ -19,6 +19,22 @@ function getConfigFromUrl() {
 
 const config = getConfigFromUrl();
 
+// Narrow diagnostics (temporary): establish whether a push reaches this worker
+// and whether the background handler reaches showNotification(). No tokens,
+// credentials, or private keys are logged.
+console.info("[Cars24 FCM] service worker started", {
+  hasConfig: !!config,
+  scope: typeof self.registration !== "undefined" ? self.registration.scope : null,
+});
+
+// Registered before Firebase's own handler so an initialization failure (e.g. a
+// missing/unparseable config) does not hide whether the push is delivered.
+self.addEventListener("push", (event) => {
+  console.info("[Cars24 FCM] push event received", {
+    hasData: !!event.data,
+  });
+});
+
 if (config && firebase.apps.length === 0) {
   firebase.initializeApp(config);
 }
@@ -32,12 +48,23 @@ messaging.onBackgroundMessage((payload) => {
   const title = data.title || "Cars24";
   const body = data.body || "";
 
-  self.registration.showNotification(title, {
-    body,
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
-    data,
+  console.info("[Cars24 FCM] onBackgroundMessage called", {
+    hasData: !!data,
+    hasTitle: !!data.title,
+    hasBody: !!data.body,
   });
+
+  self.registration
+    .showNotification(title, {
+      body,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      data,
+    })
+    .then(() => console.info("[Cars24 FCM] showNotification resolved"))
+    .catch((error) =>
+      console.error("[Cars24 FCM] showNotification failed", error)
+    );
 });
 
 self.addEventListener("notificationclick", (event) => {
