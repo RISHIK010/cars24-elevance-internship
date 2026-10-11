@@ -126,12 +126,21 @@ export async function enableNotifications(): Promise<{
     throw new Error("Notifications are not supported in this browser");
   if (!isFirebaseConfigured()) throw new Error("Firebase is not configured");
 
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
+  const requested = await Notification.requestPermission();
+  // requestPermission() can resolve to "granted" while the browser's persisted
+  // permission is still "default" (e.g. a quiet/dismissed prompt in Edge). Trust
+  // the live permission state, because that is what determines whether the
+  // service worker is actually allowed to display a notification.
+  const actual = getCurrentPermission();
+
+  if (requested !== "granted" || actual !== "granted") {
+    if (requested === "denied" || actual === "denied") {
+      throw new Error(
+        "Notifications are blocked in your browser. Allow them in your browser settings and try again."
+      );
+    }
     throw new Error(
-      permission === "denied"
-        ? "Notifications are blocked in your browser. Allow them in your browser settings and try again."
-        : "Notification permission was not granted. Please allow notifications and try again."
+      "Notification permission was not granted. Please allow notifications and try again."
     );
   }
 

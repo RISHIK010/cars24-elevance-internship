@@ -27,12 +27,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   useEffect(() => {
+    let cancelled = false;
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+
+    if (!storedUser) {
+      setLoading(false);
+      return;
     }
+
+    const parsed = (() => {
+      try {
+        return JSON.parse(storedUser) as User;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!parsed || !parsed.id) {
+      localStorage.removeItem("user");
+      setLoading(false);
+      return;
+    }
+
+    // Re-validate the stored identity against the backend before exposing it.
+    // A stale user id (e.g. one left over from an earlier database reset or an
+    // old account) must never be used to register notification devices or to
+    // dispatch appointment notifications under the wrong user.
+    api
+      .getUserById(parsed.id)
+      .then((fresh) => {
+        if (cancelled) return;
+        if (!fresh) {
+          // The stored account no longer exists. Force a fresh sign-in so the
+          // current, correct user id is used for notifications and dispatch.
+          setUser(null);
+          localStorage.removeItem("user");
+          return;
+        }
+        const refreshed: User = {
+          id: fresh.id,
+          email: fresh.email ?? parsed.email,
+          fullName: fresh.fullName ?? parsed.fullName,
+          phone: fresh.phone ?? parsed.phone,
+        };
+        setUser(refreshed);
+        localStorage.setItem("user", JSON.stringify(refreshed));
+      })
+      .catch(() => {
+        // Backend unreachable or a transient error: fall back to the stored
+        // identity instead of logging the user out on a temporary failure.
+        if (!cancelled) setUser(parsed);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
