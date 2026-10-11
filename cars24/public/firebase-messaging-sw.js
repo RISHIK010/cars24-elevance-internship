@@ -27,45 +27,161 @@ console.info("[Cars24 FCM] service worker started", {
   scope: typeof self.registration !== "undefined" ? self.registration.scope : null,
 });
 
-// Registered before Firebase's own handler so an initialization failure (e.g. a
-// missing/unparseable config) does not hide whether the push is delivered.
-self.addEventListener("push", (event) => {
-  console.info("[Cars24 FCM] push event received", {
-    hasData: !!event.data,
+// --- Shared notification helpers -------------------------------------------
+// Tracks payloads already displayed so the Firebase SDK background handler and
+// the raw-payload fallback below can never render two notifications for one
+// message.
+const shownPayloadKeys = new Set();
+
+function showNotificationOnce(data, source) {
+  const safeData = data && typeof data === "object" ? data : {};
+  const key = JSON.stringify([
+    safeData.type || "",
+    safeData.title || "",
+    safeData.body || "",
+    safeData.vehicleId || "",
+    safeData.actionUrl || "",
+  ]);
+
+  if (shownPayloadKeys.has(key)) {
+    console.info("[Cars24 FCM] duplicate notification suppressed", { source });
+    return Promise.resolve(false);
+  }
+
+  // Bound memory over a long-lived worker. The set only needs to deduplicate
+  // messages being processed for the same push event.
+  if (shownPayloadKeys.size >= 100) {
+    shownPayloadKeys.clear();
+  }
+  shownPayloadKeys.add(key);
+
+  const title = safeData.title || "Cars24";
+  const body = safeData.body || "";
+
+  console.info("[Cars24 FCM] showNotification", {
+    source,
+    hasTitle: !!safeData.title,
+    hasBody: !!safeData.body,
   });
-});
 
-if (config && firebase.apps.length === 0) {
-  firebase.initializeApp(config);
-}
-
-const messaging = firebase.messaging();
-
-// Background messages: the backend sends data-only payloads, so we render the
-// notification ourselves and attach the payload for click navigation.
-messaging.onBackgroundMessage((payload) => {
-  const data = (payload && payload.data) || {};
-  const title = data.title || "Cars24";
-  const body = data.body || "";
-
-  console.info("[Cars24 FCM] onBackgroundMessage called", {
-    hasData: !!data,
-    hasTitle: !!data.title,
-    hasBody: !!data.body,
-  });
-
-  self.registration
+  return self.registration
     .showNotification(title, {
       body,
       icon: "/favicon.ico",
       badge: "/favicon.ico",
-      data,
+      data: {
+        actionUrl: safeData.actionUrl || "/",
+        type: safeData.type || "",
+        vehicleId: safeData.vehicleId || "",
+        title,
+        body,
+      },
     })
-    .then(() => console.info("[Cars24 FCM] showNotification resolved"))
-    .catch((error) =>
-      console.error("[Cars24 FCM] showNotification failed", error)
-    );
+    .then(() => {
+      console.info("[Cars24 FCM] showNotification resolved");
+      return true;
+    })
+    .catch((error) => {
+      console.error("[Cars24 FCM] showNotification failed", error);
+      throw error;
+    });
+}
+
+// Raw-payload fallback. Registered before Firebase's own push listener so a
+// data-only message is still rendered even if Firebase initialization fails or
+// its background handler does not fire for this payload. Notification messages
+// (those carrying a `notification` object) are left to the browser/Firebase SDK
+// so they are not displayed twice.
+self.addEventListener("push", (event) => {
+  let payload = null;
+  try {
+    payload = event.data ? event.data.json() : null;
+  } catch (error) {
+    payload = null;
+  }
+
+  console.info("[Cars24 FCM] push event received", {
+    hasData: !!event.data,
+    hasPayload: !!payload,
+    hasNotification: !!(payload && payload.notification),
+  });
+
+  if (!payload || payload.notification) {
+    return;
+  }
+
+  // Data-only payloads arrive as { data: { ... } } (FCM envelope) or, from some
+  // senders, as the data object at the top level.
+  const data =
+    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+      ? payload.data
+      : payload;
+
+  if (!data || typeof data !== "object" || (!data.title && !data.body)) {
+    return;
+  }
+
+  event.waitUntil(
+    (async () => {
+      // Mirror the SDK: when a page is focused the foreground onMessage handler
+      // (in-app toast) is the single notification surface, so do not also raise
+      // a system notification.
+      try {
+        const clientList = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        const hasVisibleClient = clientList.some(
+          (client) =>
+            client.visibilityState === "visible" &&
+            !client.url.startsWith("chrome-extension://")
+        );
+        if (hasVisibleClient) {
+          return;
+        }
+      } catch (error) {
+        // Ignore: if visibility cannot be determined, show the notification.
+      }
+
+      await showNotificationOnce(data, "fallback");
+    })().catch(() => {
+      // showNotificationOnce already logs failures; avoid an unhandled
+      // rejection inside waitUntil.
+    })
+  );
 });
+
+if (config && firebase.apps.length === 0) {
+  try {
+    firebase.initializeApp(config);
+  } catch (error) {
+    console.error("[Cars24 FCM] initializeApp failed", error);
+  }
+}
+
+let messaging = null;
+try {
+  messaging = firebase.messaging();
+} catch (error) {
+  console.error("[Cars24 FCM] firebase.messaging() failed", error);
+}
+
+// Background messages: the backend sends data-only payloads, so we render the
+// notification ourselves and attach the payload for click navigation. This path
+// shares the dedupe guard with the raw-payload fallback above.
+if (messaging) {
+  messaging.onBackgroundMessage((payload) => {
+    const data = (payload && payload.data) || {};
+
+    console.info("[Cars24 FCM] onBackgroundMessage called", {
+      hasData: !!data,
+      hasTitle: !!data.title,
+      hasBody: !!data.body,
+    });
+
+    return showNotificationOnce(data, "sdk");
+  });
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
@@ -98,6 +214,10 @@ self.addEventListener("message", (event) => {
     event.data.config &&
     firebase.apps.length === 0
   ) {
-    firebase.initializeApp(event.data.config);
+    try {
+      firebase.initializeApp(event.data.config);
+    } catch (error) {
+      console.error("[Cars24 FCM] FCM_INIT initializeApp failed", error);
+    }
   }
 });
