@@ -56,7 +56,9 @@ public class FcmSender : IFcmSender
     {
         if (!IsConfigured)
         {
-            _logger.LogWarning("FCM is not configured; skipping {Type} notification.", payload.Type);
+            _logger.LogWarning(
+                "FCM is not configured (Firebase:ProjectId is missing or empty); skipping {Type} notification.",
+                payload.Type);
             return false;
         }
 
@@ -86,7 +88,14 @@ public class FcmSender : IFcmSender
             };
 
             var messageId = await FirebaseMessaging.GetMessaging(GetApp()).SendAsync(message);
-            return !string.IsNullOrWhiteSpace(messageId);
+            if (string.IsNullOrWhiteSpace(messageId))
+            {
+                _logger.LogWarning("FCM returned an empty message id for {Type} notification.", payload.Type);
+                return false;
+            }
+
+            _logger.LogInformation("FCM accepted {Type} notification (message id {MessageId}).", payload.Type, messageId);
+            return true;
         }
         catch (FirebaseMessagingException ex) when (
             ex.MessagingErrorCode == MessagingErrorCode.Unregistered ||
@@ -94,6 +103,11 @@ public class FcmSender : IFcmSender
         {
             _logger.LogWarning("FCM token invalid/unregistered ({Code}).", ex.MessagingErrorCode);
             throw new InvalidRegistrationException(ex.Message, ex);
+        }
+        catch (FirebaseMessagingException ex)
+        {
+            _logger.LogError("FCM rejected {Type} notification ({Code}).", payload.Type, ex.MessagingErrorCode);
+            return false;
         }
         catch (Exception ex)
         {

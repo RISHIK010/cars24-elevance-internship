@@ -121,19 +121,49 @@ public class NotificationService : INotificationService
 
     private async Task<int> DispatchAsync(string userId, NotificationType type, NotificationPayload payload)
     {
+        _logger.LogInformation("Dispatching {Type} notification for user {UserId}.", type, userId);
+
         var devices = await GetDevicesAsync(userId);
+
+        if (devices.Count == 0)
+        {
+            _logger.LogWarning(
+                "No active push devices registered for user {UserId}; {Type} notification was not sent.",
+                userId, type);
+            return 0;
+        }
+
         var sent = 0;
 
         foreach (var device in devices)
         {
-            if (!device.Preferences.BrowserPush) continue;
-            if (!IsCategoryEnabled(device.Preferences, type)) continue;
+            if (!device.Preferences.BrowserPush)
+            {
+                _logger.LogInformation(
+                    "Skipping {Type} notification for user {UserId} device {DeviceId}: browser push is disabled.",
+                    type, userId, device.DeviceId);
+                continue;
+            }
+
+            if (!IsCategoryEnabled(device.Preferences, type))
+            {
+                _logger.LogInformation(
+                    "Skipping {Type} notification for user {UserId} device {DeviceId}: category is disabled in preferences.",
+                    type, userId, device.DeviceId);
+                continue;
+            }
 
             try
             {
                 if (await _fcmSender.SendAsync(device.RegistrationToken, payload))
                 {
                     sent++;
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "FCM did not accept the {Type} notification for user {UserId} device {DeviceId} (see FcmSender log for the reason).",
+                        type, userId, device.DeviceId);
                 }
             }
             catch (InvalidRegistrationException)
@@ -145,6 +175,10 @@ public class NotificationService : INotificationService
                 _logger.LogError(ex, "Notification dispatch failed for user {UserId}, device {DeviceId}.", userId, device.DeviceId);
             }
         }
+
+        _logger.LogInformation(
+            "Dispatched {Type} notification for user {UserId} to {Sent}/{Total} device(s).",
+            type, userId, sent, devices.Count);
 
         return sent;
     }
