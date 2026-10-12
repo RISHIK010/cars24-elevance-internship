@@ -106,6 +106,7 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : null;
   } catch (error) {
+    console.warn("[Cars24 FCM] push payload was not valid JSON", error);
     payload = null;
   }
 
@@ -116,6 +117,9 @@ self.addEventListener("push", (event) => {
   });
 
   if (!payload || payload.notification) {
+    console.info("[Cars24 FCM] push skipped", {
+      reason: !payload ? "no-payload" : "notification-message",
+    });
     return;
   }
 
@@ -127,31 +131,20 @@ self.addEventListener("push", (event) => {
       : payload;
 
   if (!data || typeof data !== "object" || (!data.title && !data.body)) {
+    console.info("[Cars24 FCM] push skipped", {
+      reason: "missing-title-and-body",
+      hasDataField: !!payload.data,
+      dataType: typeof payload.data,
+    });
     return;
   }
 
   event.waitUntil(
     (async () => {
-      // Mirror the SDK: when a page is focused the foreground onMessage handler
-      // (in-app toast) is the single notification surface, so do not also raise
-      // a system notification.
-      try {
-        const clientList = await self.clients.matchAll({
-          type: "window",
-          includeUncontrolled: true,
-        });
-        const hasVisibleClient = clientList.some(
-          (client) =>
-            client.visibilityState === "visible" &&
-            !client.url.startsWith("chrome-extension://")
-        );
-        if (hasVisibleClient) {
-          return;
-        }
-      } catch (error) {
-        // Ignore: if visibility cannot be determined, show the notification.
-      }
-
+      // Always render a data-only push as a system notification. The Firebase
+      // SDK background handler and this fallback share the same per-push tag,
+      // so the dedupe guard below still prevents two notifications for the
+      // same push (background: fallback shows, SDK callback is suppressed).
       await showNotificationOnce(data, "fallback", pushTag);
     })().catch(() => {
       // showNotificationOnce already logs failures; avoid an unhandled
@@ -173,6 +166,10 @@ try {
   messaging = firebase.messaging();
 } catch (error) {
   console.error("[Cars24 FCM] firebase.messaging() failed", error);
+}
+
+if (!messaging) {
+  console.warn("[Cars24 FCM] Firebase messaging unavailable; SDK background handler will not run");
 }
 
 // Background messages: the backend sends data-only payloads, so we render the
