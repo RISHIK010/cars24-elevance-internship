@@ -28,32 +28,37 @@ console.info("[Cars24 FCM] service worker started", {
 });
 
 // --- Shared notification helpers -------------------------------------------
-// Tracks payloads already displayed so the Firebase SDK background handler and
-// the raw-payload fallback below can never render two notifications for one
-// message.
-const shownPayloadKeys = new Set();
+// Tracks push events already displayed so the Firebase SDK background handler
+// and the raw-payload fallback below can never render two notifications for
+// one message. The dedupe key is the unique per-push tag (not the content),
+// so a later, distinct push with an identical title/body is still shown.
+const shownPayloadTags = new Set();
 
-function showNotificationOnce(data, source) {
+// Each push gets a fresh, unique tag. Using the browser's default (empty) tag
+// would silently replace the previous notification instead of raising a new
+// Windows/Chrome banner, because renotify defaults to false.
+let pushSequence = 0;
+let lastPushTag = null;
+
+function makeUniqueTag() {
+  pushSequence += 1;
+  return "cars24-" + Date.now() + "-" + pushSequence;
+}
+
+function showNotificationOnce(data, source, tag) {
   const safeData = data && typeof data === "object" ? data : {};
-  const key = JSON.stringify([
-    safeData.type || "",
-    safeData.title || "",
-    safeData.body || "",
-    safeData.vehicleId || "",
-    safeData.actionUrl || "",
-  ]);
 
-  if (shownPayloadKeys.has(key)) {
+  if (shownPayloadTags.has(tag)) {
     console.info("[Cars24 FCM] duplicate notification suppressed", { source });
     return Promise.resolve(false);
   }
 
   // Bound memory over a long-lived worker. The set only needs to deduplicate
   // messages being processed for the same push event.
-  if (shownPayloadKeys.size >= 100) {
-    shownPayloadKeys.clear();
+  if (shownPayloadTags.size >= 100) {
+    shownPayloadTags.clear();
   }
-  shownPayloadKeys.add(key);
+  shownPayloadTags.add(tag);
 
   const title = safeData.title || "Cars24";
   const body = safeData.body || "";
@@ -67,6 +72,7 @@ function showNotificationOnce(data, source) {
   return self.registration
     .showNotification(title, {
       body,
+      tag,
       icon: "/favicon.ico",
       badge: "/favicon.ico",
       data: {
@@ -93,6 +99,9 @@ function showNotificationOnce(data, source) {
 // (those carrying a `notification` object) are left to the browser/Firebase SDK
 // so they are not displayed twice.
 self.addEventListener("push", (event) => {
+  const pushTag = makeUniqueTag();
+  lastPushTag = pushTag;
+
   let payload = null;
   try {
     payload = event.data ? event.data.json() : null;
@@ -143,7 +152,7 @@ self.addEventListener("push", (event) => {
         // Ignore: if visibility cannot be determined, show the notification.
       }
 
-      await showNotificationOnce(data, "fallback");
+      await showNotificationOnce(data, "fallback", pushTag);
     })().catch(() => {
       // showNotificationOnce already logs failures; avoid an unhandled
       // rejection inside waitUntil.
@@ -168,10 +177,11 @@ try {
 
 // Background messages: the backend sends data-only payloads, so we render the
 // notification ourselves and attach the payload for click navigation. This path
-// shares the dedupe guard with the raw-payload fallback above.
+// shares the per-push dedupe tag with the raw-payload fallback above.
 if (messaging) {
   messaging.onBackgroundMessage((payload) => {
     const data = (payload && payload.data) || {};
+    const tag = lastPushTag || makeUniqueTag();
 
     console.info("[Cars24 FCM] onBackgroundMessage called", {
       hasData: !!data,
@@ -179,7 +189,7 @@ if (messaging) {
       hasBody: !!data.body,
     });
 
-    return showNotificationOnce(data, "sdk");
+    return showNotificationOnce(data, "sdk", tag);
   });
 }
 
