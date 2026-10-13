@@ -19,5 +19,11 @@ namespace Cars24API.Models
         public string PaymentMethod { get; set; }
         public string LoanRequired { get; set; }
         public string DownPayment { get; set; }
+
+        // Purchase lifecycle state. A booking only counts as a completed
+        // purchase (and only then becomes eligible for referral rewards) once
+        // it transitions to "completed". Legacy documents without this field
+        // deserialize as null and are treated as "pending".
+        public string? Status { get; set; } = "pending";
     }
 }

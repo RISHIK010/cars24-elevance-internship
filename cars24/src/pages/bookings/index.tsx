@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getBookingbyuser } from "@/lib/Bookingapi";
+import { completeBooking, getBookingbyuser } from "@/lib/Bookingapi";
+import { toast } from "sonner";
 
 const PurchasedCarsPage = () => {
   // Mock purchased cars data matching MongoDB schema
@@ -115,22 +116,40 @@ const PurchasedCarsPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [purchasedCars, setpurchasedCars] = useState<any>(null);
-  useEffect(() => {
-    const fetchpurchasedCars = async () => {
-      try {
-        if (user) {
-          const car = await getBookingbyuser(user?.id);
-          setpurchasedCars(car);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
-    fetchpurchasedCars();
+  const loadBookings = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const car = await getBookingbyuser(user.id);
+      setpurchasedCars(car);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
   }, [user]);
+
+  const handleComplete = async (bookingId: string) => {
+    if (!user) return;
+    setCompletingId(bookingId);
+    try {
+      await completeBooking(user.id, bookingId);
+      toast.success("Purchase marked as completed.");
+      await loadBookings();
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed to complete purchase.");
+    } finally {
+      setCompletingId(null);
+    }
+  };
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -174,6 +193,26 @@ const PurchasedCarsPage = () => {
                 <p className="text-blue-200 mb-4">
                   Booking ID: {data.booking.id.slice(-8).toUpperCase()}
                 </p>
+
+                <div className="mb-4 print:hidden">
+                  {data.booking.status === "completed" ? (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-500 text-white text-sm font-medium">
+                      <Check className="w-4 h-4 mr-1" />
+                      Purchase Completed
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleComplete(data.booking.id)}
+                      disabled={completingId === data.booking.id}
+                      className="px-3 py-1 rounded-md bg-green-500 hover:bg-green-600 text-white text-sm font-medium disabled:opacity-60"
+                    >
+                      {completingId === data.booking.id
+                        ? "Completing…"
+                        : "Mark Purchase Completed"}
+                    </button>
+                  )}
+                </div>
 
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex items-center">

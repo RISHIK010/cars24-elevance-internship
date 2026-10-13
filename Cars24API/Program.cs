@@ -56,5 +56,18 @@ app.MapGet("/db-check", async () =>
 app.UseCors("AllowAll");
 app.MapControllers();
 
+// Best-effort database migration: create the wallet/credit indexes needed for
+// idempotent, race-safe credit application. Failures are logged and must never
+// prevent the application from starting.
+try
+{
+    var walletService = app.Services.GetRequiredService<WalletService>();
+    await walletService.EnsureIndexesAsync();
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Wallet index migration skipped: {Message}", ex.Message);
+}
+
 app.Run();
 

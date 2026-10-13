@@ -35,34 +35,42 @@ public class WalletController : ControllerBase
         if (request.Amount <= 0)
             return BadRequest(new { message = "Redemption amount must be greater than zero." });
 
-        if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
-        {
-            var duplicate = await _walletService.FindByIdempotencyKeyAsync(request.UserId, request.IdempotencyKey);
-            if (duplicate != null)
-                return Conflict(new { message = "Duplicate redemption detected." });
-        }
-
-        var wallet = await _walletService.GetOrCreateAsync(request.UserId);
-        if (wallet.Balance < request.Amount)
-            return BadRequest(new { message = "Insufficient wallet balance." });
-
         var referenceId = string.IsNullOrWhiteSpace(request.IdempotencyKey)
             ? Guid.NewGuid().ToString()
             : request.IdempotencyKey;
 
-        var transaction = await _walletService.DebitAsync(
-            request.UserId,
-            request.Amount,
-            "Wallet redemption",
-            referenceId,
-            request.IdempotencyKey);
-
-        return Ok(new
+        // DebitAsync owns idempotency (including retry recovery) and the
+        // insufficient-balance check. A repeated request with the same key
+        // returns the original successful redemption instead of a conflict; only
+        // a key reused with a different amount is rejected.
+        try
         {
-            message = "Redemption successful.",
-            balance = wallet.Balance - request.Amount,
-            transaction
-        });
+            var transaction = await _walletService.DebitAsync(
+                request.UserId,
+                request.Amount,
+                "Wallet redemption",
+                referenceId,
+                request.IdempotencyKey);
+
+            // Read the persisted wallet after the operation so the returned
+            // balance reflects the actual post-debit state rather than a stale
+            // snapshot.
+            var wallet = await _walletService.GetOrCreateAsync(request.UserId);
+            return Ok(new
+            {
+                message = "Redemption successful.",
+                balance = wallet.Balance,
+                transaction
+            });
+        }
+        catch (IdempotencyKeyConflictException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (InvalidOperationException)
+        {
+            return BadRequest(new { message = "Insufficient wallet balance." });
+        }
     }
 
     public class RedeemRequest

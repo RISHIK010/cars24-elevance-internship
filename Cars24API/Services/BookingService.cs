@@ -22,6 +22,27 @@ namespace Cars24API.Services
             return await _bookings.Find(a => a.Id == id).FirstOrDefaultAsync();
         }
 
+        // Marks a purchase booking as completed. Returns true when the booking
+        // is (or already was) completed, and false when it does not exist.
+        // The transition is an atomic conditional update, so concurrent and
+        // retried completion requests are safe and never transition backwards.
+        public async Task<bool> MarkCompletedAsync(string id)
+        {
+            var update = Builders<Booking>.Update.Set(b => b.Status, "completed");
+            var result = await _bookings.UpdateOneAsync(
+                Builders<Booking>.Filter.And(
+                    Builders<Booking>.Filter.Eq(b => b.Id, id),
+                    Builders<Booking>.Filter.Ne(b => b.Status, "completed")),
+                update);
+
+            if (result.MatchedCount > 0)
+                return true;
+
+            // Either the booking does not exist, or it was already completed.
+            var booking = await _bookings.Find(b => b.Id == id).FirstOrDefaultAsync();
+            return booking != null;
+        }
+
         public async Task<List<Booking>> GetAllAsync()
         {
             return await _bookings.Find(_ => true).ToListAsync();

@@ -59,6 +59,15 @@ public class ReferralService
 
     public async Task<Referral> AttachAsync(string referredUserId, string referralCode, string referrerUserId)
     {
+        // Defense-in-depth guards. Controllers already validate these, but the
+        // service enforces them too so no caller can create an invalid link.
+        if (referrerUserId == referredUserId)
+            throw new InvalidOperationException("You cannot refer yourself.");
+
+        var existing = await GetByReferredUserAsync(referredUserId);
+        if (existing != null)
+            throw new InvalidOperationException("Referral relationship already established.");
+
         var referral = new Referral
         {
             ReferrerUserId = referrerUserId,
@@ -77,16 +86,34 @@ public class ReferralService
         if (referral == null || referral.RewardGranted)
             return;
 
-        referral.RewardGranted = true;
-        referral.Status = "rewarded";
-        referral.QualifyingEventId = qualifyingEventId;
-        referral.RewardGrantedAt = DateTime.UtcNow;
-        await _referrals.ReplaceOneAsync(r => r.Id == referral.Id, referral);
+        // Stable, per-referral/per-participant reference identifiers make each
+        // credit idempotent and independent of which booking-completion request
+        // wins the race. Two concurrent completions of different bookings for the
+        // same referral reuse these exact references, so each participant is paid
+        // exactly once. If this handler is retried (or fails part-way through),
+        // an already-credited participant is never paid twice. The qualifying
+        // event id is still recorded below for audit purposes.
+        var referrerReferenceId = $"referral:{referral.Id}:referrer";
+        var referredReferenceId = $"referral:{referral.Id}:referred";
 
         await _walletService.CreditAsync(
             referral.ReferrerUserId,
             ReferralRewardAmount,
             "Referral reward",
-            qualifyingEventId);
+            referrerReferenceId);
+
+        await _walletService.CreditAsync(
+            referral.ReferredUserId,
+            ReferralRewardAmount,
+            "Referral reward",
+            referredReferenceId);
+
+        // Only mark rewarded after both credits have safely persisted, so a
+        // partial failure can be retried without losing the un-credited side.
+        referral.RewardGranted = true;
+        referral.Status = "rewarded";
+        referral.QualifyingEventId = qualifyingEventId;
+        referral.RewardGrantedAt = DateTime.UtcNow;
+        await _referrals.ReplaceOneAsync(r => r.Id == referral.Id, referral);
     }
 }

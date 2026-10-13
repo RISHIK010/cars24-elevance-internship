@@ -44,8 +44,6 @@ namespace Cars24API.Controllers
             user.BookingId.Add(booking.Id);
             await _userService.UpdateAsync(user.Id, user);
 
-            await _referralService.TryGrantReferralRewardAsync(userId, booking.Id!);
-
             await _notificationService.SendAppointmentConfirmationAsync(
                 userId,
                 booking.CarId,
@@ -60,6 +58,33 @@ namespace Cars24API.Controllers
             if (booking == null)
                 return NotFound();
             return Ok(booking);
+        }
+        [HttpPost("{id}/complete")]
+        public async Task<IActionResult> CompleteBooking(string id, [FromQuery] string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+                return BadRequest("userId is required.");
+
+            var booking = await _bookingService.GetByIdAsynch(id);
+            if (booking == null)
+                return NotFound("Booking not found.");
+
+            var user = await _userService.GetByIdAsync(userId);
+            if (user == null)
+                return NotFound("User not found.");
+
+            if (user.BookingId == null || !user.BookingId.Contains(id))
+                return BadRequest("Booking does not belong to this user.");
+
+            var completed = await _bookingService.MarkCompletedAsync(id);
+            if (!completed)
+                return NotFound("Booking not found.");
+
+            // The qualifying completed purchase is the only event that pays out
+            // referral rewards (never booking/appointment creation or signup).
+            await _referralService.TryGrantReferralRewardAsync(userId, booking.Id ?? id);
+
+            return Ok(new { message = "Booking marked as completed.", bookingId = id, status = "completed" });
         }
         [HttpGet("user/{userId}/bookings")]
         public async Task<IActionResult> GetbookingByUserId(string userId)

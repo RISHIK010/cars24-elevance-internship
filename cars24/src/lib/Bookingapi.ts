@@ -13,6 +13,18 @@ export const createBooking = async (userid: string, Booking: any) => {
   return parseResponse(response, "Failed to create booking");
 };
 
+export const completeBooking = async (userId: string, bookingId: string) => {
+  const response = await fetch(
+    `${BASE_URL}/${bookingId}/complete?userId=${userId}`,
+    { method: "POST" }
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error((data as any)?.message ?? "Failed to complete booking");
+  }
+  return data;
+};
+
 export const getBookingbyid = async (id: string) => {
   const response = await fetch(`${BASE_URL}/${id}`);
   return response.json();
